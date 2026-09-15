@@ -8,16 +8,16 @@
     "start": "next start -H 127.0.0.1 -p 3847",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:unit": "dotenv -e .env.test -- vitest run --dir src/tests/unit",
-    "test:integration": "dotenv -e .env.test -- vitest run --dir src/tests/integration",
-    "test:e2e": "dotenv -e .env.test -- playwright test",
+    "test:unit": "npx dotenv-cli -e .env.test -- vitest run --dir src/tests/unit",
+    "test:integration": "npx dotenv-cli -e .env.test -- vitest run --dir src/tests/integration",
+    "test:e2e": "npx dotenv-cli -e .env.test -- playwright test",
     "test": "npm run test:unit && npm run test:integration",
     "ci:quality": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run build",
-    "worker:dev": "dotenv -e .env -- tsx watch src/worker/block-generator.ts",
+    "worker:dev": "npx dotenv-cli -e .env -- tsx watch src/worker/block-generator.ts",
     "worker:prod": "node dist/worker/block-generator.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "dotenv -e .env -- tsx prisma/seed.ts"
+    "db:seed": "npx dotenv-cli -e .env -- tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

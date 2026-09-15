@@ -1,12 +1,31 @@
-import { describe, it, expect } from "vitest";
-import { env } from "@/lib/config";
+import { describe, it, expect, afterAll } from "vitest";
+import { prisma } from "@/lib/prisma";
 
-describe("Database Isolation Integration Verification", () => {
-  it("strictly prohibits connecting to development database during test runs", () => {
-    // Verify that the test connection does NOT point to coin_caret_dev or port 5432
-    expect(env.DATABASE_URL).not.toContain("coin_caret_dev");
-    expect(env.DATABASE_URL).not.toContain(":5432/");
-    expect(env.DATABASE_URL).toContain("coin_caret_test");
-    expect(env.DATABASE_URL).toContain(":5433/");
+describe("Live PostgreSQL Database Isolation (Integration)", () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it("actively connects to live PostgreSQL test database and confirms database name is coin_caret_test", async () => {
+    const result = await prisma.$queryRaw<Array<{ current_database: string }>>`SELECT current_database()`;
+
+    expect(result).toBeDefined();
+    expect(result.length).toBe(1);
+    expect(result[0].current_database).toBe("coin_caret_test");
+  });
+
+  it("confirms database tables exist and are ready for transactions", async () => {
+    const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+    `;
+
+    const tableNames = tables.map((t) => t.tablename);
+    expect(tableNames).toContain("users");
+    expect(tableNames).toContain("wallets");
+    expect(tableNames).toContain("wallet_addresses");
+    expect(tableNames).toContain("ledger_accounts");
+    expect(tableNames).toContain("ledger_entries");
+    expect(tableNames).toContain("transactions");
+    expect(tableNames).toContain("blocks");
   });
 });

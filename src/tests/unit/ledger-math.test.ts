@@ -37,4 +37,15 @@ describe("Double-Entry Ledger Invariants & Precision (W-104)", () => {
     const balance = deriveAccountBalance(postings);
     expect(balance.toFixed(8)).toBe("424.50000000");
   });
+
+  it("proves immunity to JavaScript floating-point precision errors (e.g. 0.1 + 0.2)", () => {
+    // In standard JavaScript floats: 0.1 + 0.2 === 0.30000000000000004
+    // In our Decimal fixed-point arithmetic: 0.10000000 + 0.20000000 === 0.30000000
+    const a = new Decimal("0.10000000");
+    const b = new Decimal("0.20000000");
+    const sum = a.plus(b);
+
+    expect(sum.toFixed(8)).toBe("0.30000000");
+    expect(sum.equals(new Decimal("0.30000000"))).toBe(true);
+  });
 });

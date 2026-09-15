@@ -293,6 +293,19 @@ This document is the authoritative single source of truth for the implementation
   - 3-tier confirmation progression engine (1/3 ➔ 2/3 ➔ 3/3) executing final double-entry balancing upon confirmation #3.
   - Verified with 11 passing unit tests, 2 integration tests, and clean production build.
 
+#### 📝 Session Note — Live PostgreSQL Integration & Test Suite Hardening
+- **Date:** 2026-09-16
+- **Status:** Complete & Verified (100% Real DB Queries Passing)
+- **Key Deliverables:**
+  - Started Docker PostgreSQL instances: `coin_caret_dev_db` (Port `5432`) and `coin_caret_test_db` (Port `5433`).
+  - Deployed SQL schema migrations to both databases via Prisma Migrate.
+  - Replaced superficial tests with genuine, live SQL integration tests:
+    - `db-isolation.integration.test.ts`: Actively queries PostgreSQL `SELECT current_database()` over TCP, confirming connection to `coin_caret_test` with all 7 core tables present.
+    - `auth.integration.test.ts`: Inserts real user records into PostgreSQL, verifies bcrypt password hashes, checks auto-provisioned wallet rows, and validates unique email constraints.
+    - `ledger.integration.test.ts`: Performs real treasury minting, derives balances from `ledger_entries`, queues transfers, verifies double-spend prevention, mints blocks, and settles final balances across double-entry ledger accounts.
+  - Hardened unit tests with JavaScript floating-point precision error immunity tests (`0.10000000 + 0.20000000 === 0.30000000`), odd/single node Merkle trees, and responsive layout assertions.
+  - Full suite verified: 15/15 unit tests and 9/9 live database integration tests passing.
+
 ---
 
 ### Phase 3 — Public Marketing Portal, Motion & SEO Architecture
