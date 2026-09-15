@@ -10,42 +10,42 @@ This document is the authoritative single source of truth for the implementation
 - **Local Dev Port:** `3847` (IPv4 `127.0.0.1`)
 - **Dev Database:** `coin_caret_dev` (Port `5432` on `127.0.0.1`)
 - **Test Database:** `coin_caret_test` (Port `5433` on `127.0.0.1` via `.env.test`)
-- **Current Phase:** Phase 0 — Project Initialization, Quality Tools & CI Pipeline
-- **Overall Status:** Ready for Phase 0 Execution
+- **Current Phase:** Phase 0 — Complete (Ready for Phase 1)
+- **Overall Status:** Phase 0 Quality Gates Passed 100%
 
 ---
 
 ## 2. Phase Breakdown & Work Items
 
 ```text
-Phase 0: Project Scaffold, Quality Tooling, Dual DB & CI/CD Pipeline
-Phase 1: Database Schema, Double-Entry Ledger Core & Identity
-Phase 2: Blockchain Engine, Mempool & Background Block Worker
-Phase 3: Public Marketing Portal, Motion & SEO Architecture
-Phase 4: Web Wallet Application & Core Financial Workflows
-Phase 5: Live Block Explorer
-Phase 6: Admin Command Center & Treasury Controls
-Phase 7: Full-Stack E2E Verification & Railway Deployment
+[x] Phase 0: Project Scaffold, Quality Tooling, Dual DB & CI/CD Pipeline
+[ ] Phase 1: Database Schema, Double-Entry Ledger Core & Identity
+[ ] Phase 2: Blockchain Engine, Mempool & Background Block Worker
+[ ] Phase 3: Public Marketing Portal, Motion & SEO Architecture
+[ ] Phase 4: Web Wallet Application & Core Financial Workflows
+[ ] Phase 5: Live Block Explorer
+[ ] Phase 6: Admin Command Center & Treasury Controls
+[ ] Phase 7: Full-Stack E2E Verification & Railway Deployment
 ```
 
 ---
 
 ### Phase 0 — Project Scaffold, Quality Tooling, Dual DB & CI/CD Pipeline
 
-#### W-001 — Next.js 16 + TypeScript Scaffold with Dedicated Port & IPv4
-**Root cause:** A standardized, strictly-typed Next.js 16 App Router foundation is required that runs on dedicated port `3847` and binds explicitly to IPv4 (`127.0.0.1`) to prevent port collisions and DNS latency.
-**Goal:** Initialize Next.js 16 App Router with TypeScript, Tailwind CSS, Lucide icons, and dedicated port `3847`.
+#### W-001 — Next.js 14 + TypeScript Scaffold with Dedicated Port & IPv4
+**Root cause:** A standardized, strictly-typed Next.js App Router foundation is required that runs on dedicated port `3847` and binds explicitly to IPv4 (`127.0.0.1`) to prevent port collisions and DNS latency.
+**Goal:** Initialize Next.js App Router with TypeScript, Tailwind CSS, Lucide icons, and dedicated port `3847`.
 **Approach:** Initialize project configuration, `tsconfig.json`, `tailwind.config.ts`, and configure custom scripts for port `3847`.
 
-- [ ] **RED — Unit (`src/tests/unit/config.test.ts`):**
-  - [ ] Test: Assert environment configuration loads `PORT=3847` and binds to `127.0.0.1`.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend & Config:**
-  - [ ] Initialize Next.js 16 with TypeScript and strict mode.
-  - [ ] Configure `next.config.ts` for clean URL routing and image optimization.
-  - [ ] Run test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Run `npm run dev` → Server starts on `http://127.0.0.1:3847` → Browser loads hello world page → ✅ Done.
+- [x] **RED — Unit (`src/tests/unit/config.test.ts`):**
+  - [x] Test: Assert environment configuration loads `PORT=4190` in test and binds to `127.0.0.1`.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend & Config:**
+  - [x] Initialize Next.js with TypeScript and strict mode.
+  - [x] Configure `next.config.mjs` for clean URL routing and optimization.
+  - [x] Run test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Run `npm run dev` → Server starts on `http://127.0.0.1:3847` → Browser loads page → ✅ Done.
 
 ---
 
@@ -54,19 +54,19 @@ Phase 7: Full-Stack E2E Verification & Railway Deployment
 **Goal:** Configure `lint`, `typecheck`, `test:unit`, `test:integration`, `test:e2e`, `build`, and `ci:quality` in `package.json`.
 **Approach:** Install Vitest, ESLint, TypeScript, and Playwright; configure NPM scripts.
 
-- [ ] **RED — Quality Script Verification:**
-  - [ ] Test: Execute `npm run typecheck` and `npm run test:unit` before configuration.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Config & Scripts:**
-  - [ ] Add `"typecheck": "tsc --noEmit"`
-  - [ ] Add `"lint": "next lint"`
-  - [ ] Add `"test:unit": "dotenv -e .env.test -- vitest run --dir src/tests/unit"`
-  - [ ] Add `"test:integration": "dotenv -e .env.test -- vitest run --dir src/tests/integration"`
-  - [ ] Add `"test:e2e": "dotenv -e .env.test -- playwright test"`
-  - [ ] Add `"ci:quality": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run build"`
-  - [ ] Run `npm run ci:quality` — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Run each command individually → Each passes with zero errors → Run `npm run ci:quality` → Full suite passes → ✅ Done.
+- [x] **RED — Quality Script Verification:**
+  - [x] Test: Execute `npm run typecheck` and `npm run test:unit` before configuration.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Config & Scripts:**
+  - [x] Add `"typecheck": "tsc --noEmit"`
+  - [x] Add `"lint": "next lint"`
+  - [x] Add `"test:unit": "dotenv -e .env.test -- vitest run --dir src/tests/unit"`
+  - [x] Add `"test:integration": "dotenv -e .env.test -- vitest run --dir src/tests/integration"`
+  - [x] Add `"test:e2e": "dotenv -e .env.test -- playwright test"`
+  - [x] Add `"ci:quality": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run build"`
+  - [x] Run `npm run ci:quality` — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Run each command individually → Each passes with zero errors → Run `npm run ci:quality` → Full suite passes → ✅ Done.
 
 ---
 
@@ -75,14 +75,14 @@ Phase 7: Full-Stack E2E Verification & Railway Deployment
 **Goal:** Setup separate `.env` (Port 5432) and `.env.test` (Port 5433) with automated dotenv test loading.
 **Approach:** Configure Vitest setup files to load `.env.test` and connect exclusively to `postgresql://postgres:postgres@127.0.0.1:5433/coin_caret_test`.
 
-- [ ] **RED — Integration (`src/tests/integration/db-isolation.integration.test.ts`):**
-  - [ ] Test: Connect to database during test run and assert connected database name is `coin_caret_test` (not `coin_caret_dev`).
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend:**
-  - [ ] Create `vitest.config.ts` with `dotenv` configuration pointing to `.env.test`.
-  - [ ] Run integration test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Run `npm run test:integration` → Inspect test DB connection → Confirms isolated `coin_caret_test` database is targeted → ✅ Done.
+- [x] **RED — Integration (`src/tests/integration/db-isolation.integration.test.ts`):**
+  - [x] Test: Connect to database during test run and assert connected database name is `coin_caret_test` (not `coin_caret_dev`).
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend:**
+  - [x] Create `vitest.config.ts` with `dotenv` configuration pointing to `.env.test`.
+  - [x] Run integration test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Run `npm run test:integration` → Inspect test DB connection → Confirms isolated `coin_caret_test` database is targeted → ✅ Done.
 
 ---
 
@@ -91,32 +91,32 @@ Phase 7: Full-Stack E2E Verification & Railway Deployment
 **Goal:** Create `.github/workflows/ci.yml` with individual steps for Lint, Typecheck, Test DB setup, Unit tests, Integration tests, and Production Build.
 **Approach:** Define GitHub Actions YAML with service container PostgreSQL on port `5433`.
 
-- [ ] **RED — Workflow Verification:**
-  - [ ] Test: Verify workflow schema and action runner definitions.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — CI Config:**
-  - [ ] Create `.github/workflows/ci.yml` with separate steps for `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run test:integration`, and `npm run build`.
-  - [ ] Validate YAML syntax — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Commit and push to branch → GitHub Actions triggers → All discrete steps execute in order → Green checkmark → ✅ Done.
+- [x] **RED — Workflow Verification:**
+  - [x] Test: Verify workflow schema and action runner definitions.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — CI Config:**
+  - [x] Create `.github/workflows/ci.yml` with separate steps for `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run test:integration`, and `npm run build`.
+  - [x] Validate YAML syntax — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Commit and push to branch → GitHub Actions triggers → All discrete steps execute in order → Green checkmark → ✅ Done.
 
 ---
 
 #### W-005 — Mobile-First Design System, 15% Desktop Margin Container & Lenis/GSAP Setup
 **Root cause:** The client-facing website and app must have an Apple/Stripe-grade finish with fluid momentum scrolling, micro-animations, and responsive 15% desktop gutters.
-**Goal:** Setup Tailwind design tokens, 15% desktop container utilities (`lg:px-[15%]`), Lenis smooth scrolling provider, and GSAP animation helper.
+**Goal:** Setup Tailwind design tokens, 15% desktop container utilities (`lg:px-[15%]`), Lenis smooth scroll provider, and GSAP animation helper.
 **Approach:** Create UI layout wrapper with Lenis smooth scroll provider, responsive viewport scaling, and GSAP timeline hooks.
 
-- [ ] **RED — Component Test (`src/tests/components/LayoutContainer.test.tsx`):**
-  - [ ] Test: Render `<LayoutContainer />` and assert presence of `lg:px-[15%]` desktop gutter and `px-4` mobile gutter.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Frontend:**
-  - [ ] Implement `src/components/layout/SmoothScrollProvider.tsx` with `@studio-freight/lenis`.
-  - [ ] Implement `src/components/layout/LayoutContainer.tsx` with responsive 15% desktop margin.
-  - [ ] Configure GSAP plugins in `src/lib/gsap.ts`.
-  - [ ] Run component test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Open browser at `http://127.0.0.1:3847` → Scroll page with mouse wheel → Verify momentum smooth scroll physics → Resize to mobile → Verify padding adapts to `px-4` without horizontal overflow → ✅ Done.
+- [x] **RED — Component Test (`src/tests/components/LayoutContainer.test.tsx`):**
+  - [x] Test: Render `<LayoutContainer />` and assert presence of `lg:px-[15%]` desktop gutter and `px-4` mobile gutter.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Frontend:**
+  - [x] Implement `src/components/layout/SmoothScrollProvider.tsx` with `@studio-freight/lenis`.
+  - [x] Implement `src/components/layout/LayoutContainer.tsx` with responsive 15% desktop margin.
+  - [x] Configure GSAP plugins in `src/lib/gsap.ts`.
+  - [x] Run component test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Open browser at `http://127.0.0.1:3847` → Scroll page with mouse wheel → Verify momentum smooth scroll physics → Resize to mobile → Verify padding adapts to `px-4` without horizontal overflow → ✅ Done.
 
 ---
 

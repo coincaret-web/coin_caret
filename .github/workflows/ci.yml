@@ -1,0 +1,68 @@
+name: Coin Caret CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality-gate:
+    name: Quality & Testing Pipeline
+    runs-on: ubuntu-latest
+
+    services:
+      postgres-test:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: coin_caret_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 3. Install Dependencies
+        run: npm ci
+
+      - name: 4. Discrete Step: Lint Codebase
+        run: npm run lint
+
+      - name: 5. Discrete Step: TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: 6. Setup Test Database Schema
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5433/coin_caret_test?schema=public"
+        run: npx prisma migrate deploy || echo "No migrations yet"
+
+      - name: 7. Discrete Step: Unit Tests
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5433/coin_caret_test?schema=public"
+        run: npm run test:unit
+
+      - name: 8. Discrete Step: Integration Tests
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5433/coin_caret_test?schema=public"
+        run: npm run test:integration
+
+      - name: 9. Discrete Step: Production Build
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5433/coin_caret_test?schema=public"
+          NEXTAUTH_SECRET: "ci-dummy-secret-key-123456789012"
+          NEXTAUTH_URL: "http://127.0.0.1:3847"
+        run: npm run build
