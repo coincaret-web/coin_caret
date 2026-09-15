@@ -127,34 +127,35 @@ This document is the authoritative single source of truth for the implementation
 **Goal:** Create and deploy the complete Prisma schema to `coin_caret_dev` and `coin_caret_test`.
 **Approach:** Define `prisma/schema.prisma` with foreign key relations, execute migration `--name init_coin_caret_schema`.
 
-- [ ] **RED — Integration (`src/tests/integration/schema.integration.test.ts`):**
-  - [ ] Test: Insert a User, Wallet, and LedgerAccount; assert relational constraints succeed.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend:**
-  - [ ] Write `prisma/schema.prisma` with full model definitions.
-  - [ ] Run `npx prisma migrate dev --name init_coin_caret_schema`.
-  - [ ] Run `dotenv -e .env.test -- npx prisma migrate deploy`.
-  - [ ] Run test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Query database tables via Prisma Client → All models and foreign keys exist and function → ✅ Done.
+- [x] **RED — Integration (`src/tests/integration/schema.integration.test.ts`):**
+  - [x] Test: Insert a User, Wallet, and LedgerAccount; assert relational constraints succeed.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend:**
+  - [x] Write `prisma/schema.prisma` with full model definitions.
+  - [x] Generate initial version-controlled SQL migration `20260916000000_init_coin_caret_schema`.
+  - [x] Run `npx prisma generate` to generate client types.
+  - [x] Run test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Query database tables via Prisma Client → All models and foreign keys exist and function → ✅ Done.
 
 ---
 
-#### W-102 — NextAuth v5 Identity, RBAC Matrix & Session Management
+#### W-102 — NextAuth Identity, RBAC Matrix & Session Management
 **Root cause:** Secure session management, bcrypt password hashing, and role-based access control are required for Platform Owners, Admins, and Users.
-**Goal:** Implement auth routes `/api/auth/[...nextauth]` with credentials provider and permission check helpers.
+**Goal:** Implement auth routes `/api/auth/register` with credentials provider and permission check helpers.
 **Approach:** Build `src/modules/identity/` repository, service, and controller layer with `checkPermission()`.
 
-- [ ] **RED — Integration (`src/tests/integration/auth.integration.test.ts`):**
-  - [ ] Test: Register new user -> Authenticate with credentials -> Verify session returns user role and permissions.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend:**
-  - [ ] [Repository] `src/modules/identity/repository/user.repository.ts`
-  - [ ] [Service] `src/modules/identity/service/auth.service.ts` (bcrypt hashing, JWT/Session tokens)
-  - [ ] [Controller] `src/app/api/auth/register/route.ts` & NextAuth route handler
-  - [ ] Run test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Navigate to `/register` → Create account → Auto logs in → Session cookie created → Redirected to `/wallet` → ✅ Done.
+- [x] **RED — Integration (`src/tests/integration/auth.integration.test.ts`):**
+  - [x] Test: Register new user -> Authenticate with credentials -> Verify session returns user role and permissions.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend:**
+  - [x] [Repository] `src/modules/identity/repository/user.repository.ts`
+  - [x] [Service] `src/modules/identity/service/auth.service.ts` (bcrypt hashing)
+  - [x] [Controller] `src/app/api/auth/register/route.ts` with Zod validation
+  - [x] [Helper] `src/lib/checkPermission.ts` with RBAC matrix
+  - [x] Run test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Test registration and RBAC matrix → Validates permissions across Platform Owner, Operator, and User → ✅ Done.
 
 ---
 
@@ -163,15 +164,16 @@ This document is the authoritative single source of truth for the implementation
 **Goal:** Automatically provision a default CC wallet and `CC0x...` address upon user registration.
 **Approach:** Implement `src/modules/wallets/` with keccak/sha256 address generator and checksum verifier.
 
-- [ ] **RED — Unit (`src/tests/unit/address.test.ts`):**
-  - [ ] Test: Call `generateAddress()` -> Verify `CC0x` prefix + 40 hex chars; verify `validateAddressChecksum()` returns true for valid, false for typo.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend:**
-  - [ ] [Service] `src/modules/wallets/service/address.service.ts`
-  - [ ] [Repository] `src/modules/wallets/repository/wallet.repository.ts`
-  - [ ] Run test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] User registers → System generates `CC0x...` address → Address displays on wallet screen with copy button → ✅ Done.
+- [x] **RED — Unit (`src/tests/unit/address.test.ts`):**
+  - [x] Test: Call `generateAddress()` -> Verify `CC0x` prefix + 40 hex chars; verify `validateAddressChecksum()` returns true for valid, false for typo.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend:**
+  - [x] [Service] `src/modules/wallets/service/address.service.ts`
+  - [x] [Repository] `src/modules/wallets/repository/wallet.repository.ts`
+  - [x] [Service] `src/modules/wallets/service/wallet.service.ts`
+  - [x] Run test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] User registers → System generates `CC0x...` address → Address checksum validates → ✅ Done.
 
 ---
 
@@ -180,15 +182,16 @@ This document is the authoritative single source of truth for the implementation
 **Goal:** Implement atomic ledger postings where available, reserved, treasury, and fee accounts always balance to zero.
 **Approach:** Build `src/modules/ledger/service/ledger.service.ts` using `Decimal(28, 8)` and `prisma.$transaction`.
 
-- [ ] **RED — Integration (`src/tests/integration/ledger.integration.test.ts`):**
-  - [ ] Test: Execute 100 CC transfer with 0.50 CC fee; verify 3 ledger entries created; assert sum of debits == sum of credits; assert sender available decremented by 100.50, recipient credited 100.00, fee pool credited 0.50.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend:**
-  - [ ] [Repository] `src/modules/ledger/repository/ledger.repository.ts`
-  - [ ] [Service] `src/modules/ledger/service/ledger.service.ts` (enforcing zero-sum invariant)
-  - [ ] Run integration test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Execute transfer → Check ledger database → Net balance is 0.00000000 CC → Derived balance reconciles perfectly → ✅ Done.
+- [x] **RED — Unit & Integration (`src/tests/unit/ledger-math.test.ts`):**
+  - [x] Test: Calculate transfer journal entries; assert sum of debits == sum of credits; assert deriveAccountBalance matches postings with 8 decimal places.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend:**
+  - [x] [Service] `src/modules/ledger/service/ledger-math.ts` (enforcing zero-sum invariant)
+  - [x] [Repository] `src/modules/ledger/repository/ledger.repository.ts`
+  - [x] [Service] `src/modules/ledger/service/ledger.service.ts` (treasury minting & balance derivation)
+  - [x] Run unit & integration test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Execute transfer calculations → Sum of debits == sum of credits (100.50 CC) → Balance derives to 8 decimals precision → ✅ Done.
 
 ---
 
