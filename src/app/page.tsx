@@ -1,103 +1,120 @@
 import React from "react";
+import Link from "next/link";
 import { LayoutContainer } from "@/components/layout/LayoutContainer";
-import { ArrowRight, Shield, Zap, Activity } from "lucide-react";
+import { Navbar } from "@/components/marketing/Navbar";
+import { LiveNetworkStats } from "@/components/marketing/LiveNetworkStats";
+import { FeatureGrid } from "@/components/marketing/FeatureGrid";
+import { ArchitectureShowcase } from "@/components/marketing/ArchitectureShowcase";
+import { Footer } from "@/components/marketing/Footer";
+import { ArrowRight, ShieldCheck, Sparkles, Terminal, ArrowUpRight } from "lucide-react";
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[#0B0F17] flex flex-col justify-between">
-      {/* Navigation Bar */}
-      <header className="border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md sticky top-0 z-50">
-        <LayoutContainer className="h-20 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-500/20 text-xl tracking-wider">
-              CC
-            </div>
-            <span className="font-bold text-xl tracking-tight text-white">COIN CARET</span>
-          </div>
-          <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-400">
-            <span className="hover:text-emerald-400 transition-colors cursor-pointer">Ecosystem</span>
-            <span className="hover:text-emerald-400 transition-colors cursor-pointer">Live Network</span>
-            <span className="hover:text-emerald-400 transition-colors cursor-pointer">Explorer</span>
-            <span className="hover:text-emerald-400 transition-colors cursor-pointer">Security</span>
-          </nav>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm font-medium text-slate-300 hover:text-white transition-colors cursor-pointer">Sign In</span>
-            <button className="px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition-all shadow-lg shadow-emerald-500/25">
-              Launch App
-            </button>
-          </div>
-        </LayoutContainer>
-      </header>
+    <main className="min-h-screen bg-[#0B0F17] flex flex-col justify-between text-slate-100 selection:bg-emerald-500 selection:text-slate-950">
+      {/* 1. Header Navigation */}
+      <Navbar />
 
-      {/* Hero Section */}
-      <section className="py-24 md:py-32 relative overflow-hidden flex-1 flex items-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(16,185,129,0.08),transparent_70%)] pointer-events-none" />
+      {/* 2. Hero Section */}
+      <section className="relative pt-16 pb-20 md:pt-24 md:pb-32 overflow-hidden">
+        {/* Background glow effects */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[300px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+
         <LayoutContainer className="relative z-10 text-center">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 text-xs font-medium mb-8">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Coin Caret Mainnet Active • Block Interval 10.0s</span>
+          {/* Mainnet Live Badge */}
+          <div className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-8 shadow-inner shadow-emerald-500/20 backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>Coin Caret Mainnet Active</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-300 font-mono">Block Interval 10.0s</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.1] max-w-4xl mx-auto">
-            The Digital Currency Engine Built for <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">Speed and Precision</span>
+          {/* Main Heading */}
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.08] max-w-4xl mx-auto">
+            The Digital Currency Engine Built for{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+              Speed and Precision
+            </span>
           </h1>
 
+          {/* Subtitle */}
           <p className="mt-6 text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto font-normal leading-relaxed">
             Experience high-throughput blockchain settlement, verifiable cryptographic double-entry ledger accounting, and seamless digital asset management.
           </p>
 
+          {/* Action CTAs */}
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-base transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-2 group">
-              <span>Open CC Wallet</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button className="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold text-base transition-all">
-              Live Block Explorer
-            </button>
+            <Link
+              href="/wallet"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-base transition-all shadow-xl shadow-emerald-500/25 flex items-center justify-center space-x-2 group hover:scale-[1.02]"
+            >
+              <button className="flex items-center space-x-2">
+                <span>Open CC Wallet</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </Link>
+            <Link
+              href="/explorer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-base transition-all flex items-center justify-center space-x-2 hover:border-slate-700"
+            >
+              <button className="flex items-center space-x-2">
+                <span>Live Block Explorer</span>
+                <ArrowUpRight className="w-4 h-4 text-slate-400" />
+              </button>
+            </Link>
           </div>
 
-          {/* Quick Metrics Grid */}
-          <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-4">
-                <Zap className="w-5 h-5" />
-              </div>
-              <div className="text-2xl font-bold text-white tracking-tight">10.0s</div>
-              <div className="text-sm text-slate-400 mt-1">Deterministic Block Time</div>
-            </div>
+          {/* 3. Live Network Metrics Strip */}
+          <div className="mt-16 pt-8 border-t border-slate-800/80">
+            <LiveNetworkStats />
+          </div>
+        </LayoutContainer>
+      </section>
 
-            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm">
-              <div className="w-10 h-10 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4">
-                <Shield className="w-5 h-5" />
-              </div>
-              <div className="text-2xl font-bold text-white tracking-tight">100% Verifiable</div>
-              <div className="text-sm text-slate-400 mt-1">Double-Entry Ledger Integrity</div>
-            </div>
+      {/* 4. Core Protocol Feature Grid */}
+      <LayoutContainer>
+        <FeatureGrid />
+      </LayoutContainer>
 
-            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-sm">
-              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4">
-                <Activity className="w-5 h-5" />
+      {/* 5. Settlement Architecture Showcase */}
+      <LayoutContainer>
+        <ArchitectureShowcase />
+      </LayoutContainer>
+
+      {/* 6. Security Invariants Section */}
+      <section id="security" className="py-24 border-t border-slate-800/80 bg-slate-950/40">
+        <LayoutContainer>
+          <div className="p-10 md:p-14 rounded-3xl bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-slate-950/80 border border-emerald-500/20 backdrop-blur-2xl relative overflow-hidden">
+            <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 max-w-3xl">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-6">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Zero-Float Mathematical Guarantee</span>
               </div>
-              <div className="text-2xl font-bold text-white tracking-tight">3-Tier Settlement</div>
-              <div className="text-sm text-slate-400 mt-1">Block Confirmations Protocol</div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                Zero Ledger Drift. Zero Phantom Minting.
+              </h2>
+              <p className="mt-4 text-base sm:text-lg text-slate-300 leading-relaxed">
+                All ledger entries use exact Decimal(28, 8) precision executed inside isolated database transactions. From treasury creation to final settlement, every credit is mathematically backed by an exact debit.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-4 text-xs font-mono text-emerald-300">
+                <div className="px-3.5 py-2 rounded-lg bg-emerald-950/50 border border-emerald-800/60">
+                  ∑ Debits == ∑ Credits
+                </div>
+                <div className="px-3.5 py-2 rounded-lg bg-emerald-950/50 border border-emerald-800/60">
+                  SHA-256 Merkle Root
+                </div>
+                <div className="px-3.5 py-2 rounded-lg bg-emerald-950/50 border border-emerald-800/60">
+                  Idempotency Protected
+                </div>
+              </div>
             </div>
           </div>
         </LayoutContainer>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-10 bg-slate-950/60">
-        <LayoutContainer className="flex flex-col md:flex-row items-center justify-between text-slate-500 text-sm gap-4">
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-slate-400">Coin Caret Network</span>
-            <span>•</span>
-            <span>Mainnet Protocol v1.0</span>
-          </div>
-          <div>
-            © {new Date().getFullYear()} Coin Caret. All rights reserved.
-          </div>
-        </LayoutContainer>
-      </footer>
+      {/* 7. Footer */}
+      <Footer />
     </main>
   );
 }

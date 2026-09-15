@@ -1,0 +1,59 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
+import HomePage from "@/app/page";
+import { LiveNetworkStats } from "@/components/marketing/LiveNetworkStats";
+import { FeatureGrid } from "@/components/marketing/FeatureGrid";
+
+describe("Landing Page & Hero Component (W-301)", () => {
+  it("renders the main hero heading and luxury brand elements", () => {
+    render(<HomePage />);
+    
+    // Brand title and acronym
+    const brandElements = screen.getAllByText("COIN CARET");
+    expect(brandElements.length).toBeGreaterThanOrEqual(1);
+    
+    // Core value proposition
+    expect(screen.getByText(/The Digital Currency Engine Built for/i)).toBeDefined();
+    expect(screen.getByText(/Speed and Precision/i)).toBeDefined();
+    
+    // Call to Action buttons
+    expect(screen.getByRole("button", { name: /Open CC Wallet/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Live Block Explorer/i })).toBeDefined();
+  });
+
+  it("renders the live network status indicator badge", () => {
+    render(<HomePage />);
+    expect(screen.getByText(/Coin Caret Mainnet Active/i)).toBeDefined();
+    expect(screen.getByText(/Block Interval 10.0s/i)).toBeDefined();
+  });
+
+  it("renders the LiveNetworkStats component with core blockchain metrics", () => {
+    const mockStats = {
+      blockHeight: 14280,
+      totalTransactions: 98450,
+      avgBlockTime: "10.0s",
+      circulatingSupply: "12,500,000 CC",
+      gasPrice: "0.0005 CC",
+      activeValidators: 24,
+    };
+
+    render(<LiveNetworkStats initialStats={mockStats} />);
+    
+    expect(screen.getByText("Block Height")).toBeDefined();
+    expect(screen.getByText("14,280")).toBeDefined();
+    expect(screen.getByText("Avg Block Time")).toBeDefined();
+    expect(screen.getByText("10.0s")).toBeDefined();
+    expect(screen.getByText("Circulating Supply")).toBeDefined();
+    expect(screen.getByText("12,500,000 CC")).toBeDefined();
+  });
+
+  it("renders the FeatureGrid component with double-entry and 3-tier security features", () => {
+    render(<FeatureGrid />);
+    
+    expect(screen.getByText(/Mathematical Double-Entry/i)).toBeDefined();
+    expect(screen.getByText(/3-Tier Block Finality/i)).toBeDefined();
+    expect(screen.getByText(/10-Second Block Times/i)).toBeDefined();
+    expect(screen.getByText(/Sub-Cent Network Fees/i)).toBeDefined();
+  });
+});
