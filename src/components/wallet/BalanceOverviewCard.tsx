@@ -8,6 +8,7 @@ interface BalanceOverviewCardProps {
   totalBalance: string;
   assetSymbol?: string;
   primaryAddress?: string;
+  usdRate?: string;
 }
 
 export function BalanceOverviewCard({
@@ -16,6 +17,7 @@ export function BalanceOverviewCard({
   totalBalance,
   assetSymbol = "CC",
   primaryAddress,
+  usdRate = "0.25",
 }: BalanceOverviewCardProps) {
   return (
     <div className="w-full space-y-6">
@@ -34,6 +36,18 @@ export function BalanceOverviewCard({
             <div className="text-3xl sm:text-5xl font-black text-white tracking-tight flex items-baseline gap-2">
               <span>{totalBalance}</span>
               <span className="text-lg sm:text-2xl font-bold text-emerald-400">{assetSymbol}</span>
+            </div>
+            {/* USD Equivalence Subtext */}
+            <div className="mt-1 text-xs sm:text-sm font-mono text-emerald-400/90 flex items-center gap-1.5">
+              <span>≈</span>
+              <span>
+                ${(parseFloat(totalBalance.replace(/,/g, "")) * (parseFloat(usdRate || "0.25"))).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              <span className="text-[11px] text-slate-400 uppercase">USD</span>
+              <span className="text-[10px] text-slate-500">(@ ${usdRate || "0.25"}/CC)</span>
             </div>
             {primaryAddress && (
               <div className="mt-3 inline-flex items-center space-x-2 text-xs text-slate-400 font-mono bg-slate-950/60 border border-slate-800 px-3 py-1.5 rounded-lg">

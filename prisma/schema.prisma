@@ -98,6 +98,7 @@ model User {
   withdrawalRequests WithdrawalRequest[]
   issuanceRequests  TreasuryIssuanceRequest[] @relation("RequestedIssuances")
   approvedIssuances TreasuryIssuanceRequest[] @relation("ApprovedIssuances")
+  platformConfigs   PlatformConfig[]
 
   @@map("users")
 }
@@ -404,3 +405,32 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
+
+// --------------------------------------------------------
+// PLATFORM CONFIGURATION & MARKET PRICE FEEDS
+// --------------------------------------------------------
+
+model PlatformConfig {
+  id                String             @id @default(uuid())
+  key               String             @unique
+  value             String
+  description       String?
+  updatedByUserId   String?
+  updatedByUser     User?              @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedAt         DateTime           @updatedAt
+
+  @@map("platform_config")
+}
+
+model ExternalPriceFeedCache {
+  id                String             @id @default(uuid())
+  coinId            String             @unique
+  symbol            String
+  name              String
+  usdPrice          Decimal            @db.Decimal(28, 8)
+  fetchedAt         DateTime           @default(now())
+
+  @@index([coinId])
+  @@map("external_price_feed_cache")
+}
+

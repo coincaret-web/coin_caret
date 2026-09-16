@@ -96,6 +96,16 @@ export function WalletNavbar({ primaryAddress }: WalletNavbarProps) {
 
         {/* User Profile & Sign Out */}
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          {session?.user && ["PLATFORM_OWNER", "OPERATIONS_ADMIN", "FINANCE_OPERATOR", "AUDITOR"].includes((session.user as any).role) && (
+            <Link
+              href="/admin"
+              className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 shadow-sm transition-all shrink-0 animate-pulse"
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span>Admin Center</span>
+            </Link>
+          )}
+
           <Link
             href="/explorer"
             className="hidden sm:flex items-center space-x-1 text-xs font-medium text-slate-400 hover:text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-slate-900 transition-colors shrink-0"

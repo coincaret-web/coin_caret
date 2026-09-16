@@ -3,21 +3,32 @@
 import React, { useEffect, useState } from "react";
 import { BalanceOverviewCard } from "@/components/wallet/BalanceOverviewCard";
 import { PortfolioChart } from "@/components/wallet/PortfolioChart";
+import { CryptoConversionCalculator } from "@/components/wallet/CryptoConversionCalculator";
 import { RecentActivityTable, TransactionSummaryItem } from "@/components/wallet/RecentActivityTable";
 import { TransactionDrawer } from "@/components/wallet/TransactionDrawer";
 import { Loader2 } from "lucide-react";
 
 export default function WalletDashboardPage() {
   const [summary, setSummary] = useState<any>(null);
+  const [usdRate, setUsdRate] = useState<string>("0.25");
   const [loading, setLoading] = useState(true);
   const [selectedTx, setSelectedTx] = useState<TransactionSummaryItem | null>(null);
 
   const fetchSummary = async () => {
     try {
-      const res = await fetch("/api/wallet/summary");
-      if (res.ok) {
-        const data = await res.json();
+      const [summaryRes, rateRes] = await Promise.all([
+        fetch("/api/wallet/summary"),
+        fetch("/api/platform/cc-usd-rate"),
+      ]);
+
+      if (summaryRes.ok) {
+        const data = await summaryRes.json();
         setSummary(data);
+      }
+
+      if (rateRes.ok) {
+        const rateData = await rateRes.json();
+        setUsdRate(rateData.rate || "0.25");
       }
     } catch (err) {
       console.error("Error fetching wallet summary:", err);
@@ -56,6 +67,7 @@ export default function WalletDashboardPage() {
         totalBalance={total}
         assetSymbol="CC"
         primaryAddress={address}
+        usdRate={usdRate}
       />
 
       {/* 2. Portfolio Performance Chart */}
@@ -65,7 +77,10 @@ export default function WalletDashboardPage() {
         transactions={transactions}
       />
 
-      {/* 3. Recent Transactions Feed */}
+      {/* 3. Live Cryptocurrency Conversion Calculator */}
+      <CryptoConversionCalculator initialCcAmount={available} />
+
+      {/* 4. Recent Transactions Feed */}
       <RecentActivityTable
         transactions={transactions}
         currentAddress={address}

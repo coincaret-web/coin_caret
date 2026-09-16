@@ -6,7 +6,9 @@ export type PermissionCode =
   | "admin:treasury:mint"
   | "admin:withdraw:review"
   | "admin:network:config"
-  | "admin:audit:read";
+  | "admin:audit:read"
+  | "admin:config:read"
+  | "admin:config:write";
 
 export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
   PLATFORM_OWNER: [
@@ -18,6 +20,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
     "admin:withdraw:review",
     "admin:network:config",
     "admin:audit:read",
+    "admin:config:read",
+    "admin:config:write",
   ],
   OPERATIONS_ADMIN: [
     "wallet:read:own",
@@ -26,6 +30,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
     "admin:users:manage",
     "admin:withdraw:review",
     "admin:audit:read",
+    "admin:config:read",
   ],
   FINANCE_OPERATOR: [
     "wallet:read:own",
@@ -34,10 +39,13 @@ export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
     "admin:treasury:mint",
     "admin:withdraw:review",
     "admin:audit:read",
+    "admin:config:read",
+    "admin:config:write",
   ],
   AUDITOR: [
     "explorer:read",
     "admin:audit:read",
+    "admin:config:read",
   ],
   USER: [
     "wallet:read:own",

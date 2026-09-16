@@ -1,8 +1,6 @@
 import { mintNextBlock } from "@/modules/network/service/block.service";
 import { advanceConfirmations } from "@/modules/network/service/confirmation.service";
-
-const intervalMs = Number(process.env.BLOCK_INTERVAL_MS ?? "10000");
-const requiredConfirmations = Number(process.env.REQUIRED_CONFIRMATIONS ?? "3");
+import { getNetworkConfig } from "@/modules/admin/service/network-config.service";
 
 let isRunning = false;
 
@@ -11,8 +9,14 @@ export async function runBlockGenerationCycle() {
   isRunning = true;
 
   try {
+    const config = await getNetworkConfig();
+    if (config.isNetworkPaused) {
+      console.log("[Block Engine] Network settlement is PAUSED by administrator. Skipping block cycle.");
+      return;
+    }
+
     // 1. Advance existing unconfirmed transactions
-    const confirmationResult = await advanceConfirmations(requiredConfirmations);
+    const confirmationResult = await advanceConfirmations(config.requiredConfirmations);
 
     // 2. Mint next block with pending transactions from Mempool
     const newBlock = await mintNextBlock();
@@ -27,8 +31,26 @@ export async function runBlockGenerationCycle() {
   }
 }
 
+// Adaptive interval worker loop
+async function startAdaptiveWorkerLoop() {
+  console.log("[Block Generator Worker Started] Adaptive network cadence active...");
+  
+  while (true) {
+    let intervalMs = 10000;
+    try {
+      const config = await getNetworkConfig();
+      intervalMs = config.blockIntervalMs;
+    } catch {
+      // fallback
+    }
+    
+    await runBlockGenerationCycle();
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 // If executed directly as a standalone process
 if (require.main === module) {
-  console.log(`[Block Generator Worker Started] Polling every ${intervalMs}ms...`);
-  setInterval(runBlockGenerationCycle, intervalMs);
+  startAdaptiveWorkerLoop().catch(console.error);
 }
+
