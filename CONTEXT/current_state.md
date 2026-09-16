@@ -546,6 +546,108 @@ This document is the authoritative single source of truth for the implementation
 
 ---
 
+#### W-603 — Admin-Controlled CC/USD Exchange Rate (`PlatformConfig`)
+**Root cause:** The CC token has no external market price. Clients, administrators, and internal services need a single authoritative, admin-controlled USD equivalence rate so that user balances can be expressed in meaningful real-world terms without relying on any external oracle or third-party price feed.
+**Goal:** Allow Platform Owners and Finance Operators to set and update the `CC_USD_RATE` via `/admin/settings`, persisted as a `PlatformConfig` key-value record. Expose the rate via an authenticated internal API. Display the USD equivalent of a user's CC balance on the Wallet Dashboard.
+**Approach:** Add a `PlatformConfig` Prisma model (key-value store with audit fields). Build a `PlatformConfigRepository` and `PlatformConfigService` in `src/modules/admin/`. Expose `GET /api/admin/config` and `PATCH /api/admin/config` routes protected by `admin:config:write` permission. Add a `GET /api/platform/cc-usd-rate` public-internal endpoint for the wallet client to consume. Update the `BalanceOverviewCard.tsx` wallet component to display `≈ $XXX.XX USD` beneath the CC balance, sourced from this rate.
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/platform-config.integration.test.ts`):**
+  - [ ] Test 1: `PATCH /api/admin/config` with `{ key: "CC_USD_RATE", value: "0.25" }` as Platform Owner → DB record created/updated → Response 200 with updated config payload.
+  - [ ] Test 2: Repeat `PATCH` as regular `USER` role → Response **HTTP 403 Forbidden** (RBAC enforcement).
+  - [ ] Test 3: `GET /api/platform/cc-usd-rate` → Returns `{ rate: "0.25", updatedAt: "..." }` from the `platform_config` table.
+  - [ ] Test 4: Attempt to `PATCH` with a non-numeric string value (`"abc"`) → Response **HTTP 400 Bad Request** (Zod validation).
+  - [ ] Test 5: Attempt to `PATCH` with a negative rate (`"-1.00"`) → Response **HTTP 400 Bad Request**.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Schema] Add `PlatformConfig` model to `prisma/schema.prisma`. Migration name: `--name add_platform_config`. See `database_schema.md` for the full model definition.
+  - [ ] [Repository] `src/modules/admin/repository/platform-config.repository.ts` — `upsert(key, value)`, `findByKey(key)`, `findAll()`.
+  - [ ] [Service] `src/modules/admin/service/platform-config.service.ts` — `setCcUsdRate(rateString: string)`: validates numeric > 0, calls `upsert`, writes `AuditLog` entry with `beforeState`/`afterState`. `getCcUsdRate()`: fetches `CC_USD_RATE` key, returns string rate or throws `ConfigNotFoundError`.
+  - [ ] [Controller] `src/app/api/admin/config/route.ts` — `GET` lists all config entries (requires `admin:config:read`); `PATCH` validates body `{ key: string, value: string }` with Zod, enforces `admin:config:write` RBAC, calls `setCcUsdRate()`, returns updated record.
+  - [ ] [Controller] `src/app/api/platform/cc-usd-rate/route.ts` — Public-internal `GET` endpoint (no auth required); returns `{ rate: string, updatedAt: string }`. Rate is sourced exclusively from `PlatformConfig` DB — never hardcoded.
+  - [ ] [Types] `src/types/platform-config.ts` — `PlatformConfigDto`, `CcUsdRateResponse`.
+  - [ ] Run integration tests — **confirm GREEN.**
+
+- [ ] **RED — Unit (`src/tests/unit/platform-config.test.ts`):**
+  - [ ] Test: `setCcUsdRate("0.00")` → throws `InvalidRateError`.
+  - [ ] Test: `setCcUsdRate("-5")` → throws `InvalidRateError`.
+  - [ ] Test: `setCcUsdRate("abc")` → throws `InvalidRateError`.
+  - [ ] Test: `setCcUsdRate("1.25")` → resolves without error, calls `upsert` with `("CC_USD_RATE", "1.25")`.
+  - [ ] Test: `setCcUsdRate("0.00000001")` → succeeds (minimum valid rate — 1 micro-cent per CC).
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Type] Update `src/types/platform-config.ts` with frontend-facing DTO interfaces.
+  - [ ] [Component] Update `src/components/wallet/BalanceOverviewCard.tsx`: fetch `GET /api/platform/cc-usd-rate` via SWR; multiply `availableBalance` by rate and display `≈ $XXX.XX USD` in muted subtext beneath the CC balance. Show `—` gracefully if rate is not yet set.
+  - [ ] [Page] `src/app/(admin)/admin/settings/page.tsx` — Admin Settings page with a `CC/USD Rate` form field. Displays current stored rate, allows Platform Owner / Finance Operator to update it. Shows `AuditLog` of last 5 rate changes inline.
+  - [ ] [Component] `src/components/admin/PlatformConfigForm.tsx` — Controlled input for rate entry with Zod client-side validation (`> 0`, numeric). Submit calls `PATCH /api/admin/config`. Shows success/error toast.
+  - [ ] Run unit tests — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Log in as `admin@coincaret.com` → Navigate to `/admin/settings` → Set CC/USD Rate to `0.25` → Click Save → Success toast appears.
+  - [ ] Log in as `user@coincaret.com` → Navigate to `/wallet` → `BalanceOverviewCard` shows `5,000.00000000 CC ≈ $1,250.00 USD` (5000 × 0.25).
+  - [ ] Admin updates rate to `0.50` → User refreshes wallet → Balance reads `≈ $2,500.00 USD`.
+  - [ ] Attempt to set rate to `0` → Form validation rejects; no API call made.
+  - [ ] ✅ Done.
+
+---
+
+#### W-604 — CC-to-Cryptocurrency Conversion Calculator (CoinGecko Live Prices)
+**Root cause:** Users need a way to understand the real-world value of their CC holdings relative to major cryptocurrencies. Since CC is an internal token that cannot be traded on external markets, the conversion is purely informational — calculated via the admin-controlled CC/USD rate as the bridge: `CC → USD → Target Crypto`.
+**Goal:** Build a Conversion Calculator panel on the `/wallet` dashboard where users can enter a CC amount and instantly see how much of each supported cryptocurrency (BTC, ETH, SOL, BNB, LTC, XRP, DOGE) it is equivalent to, sourced from live CoinGecko prices cached server-side.
+**Approach:** Create a server-side price cache layer (`ExternalPriceFeedCache` Prisma model, TTL 60 seconds) that fetches prices from the CoinGecko v3 `simple/price` public API and stores them to avoid rate limiting. Expose a `GET /api/platform/crypto-prices` route that serves from cache and triggers a background refresh if stale. Build a `CryptoConversionCalculator.tsx` React component that takes CC amount input, fetches the CC/USD rate and live crypto prices, and computes & renders equivalents in real time.
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/crypto-prices.integration.test.ts`):**
+  - [ ] Test 1: Seed `ExternalPriceFeedCache` row for `bitcoin` with `usdPrice: 60000` and `fetchedAt` 30 seconds ago → `GET /api/platform/crypto-prices` → Returns cached value without hitting CoinGecko (`isCached: true` in response).
+  - [ ] Test 2: Seed `ExternalPriceFeedCache` row for `bitcoin` with `fetchedAt` 120 seconds ago (stale, TTL = 60s) → `GET /api/platform/crypto-prices` → System detects stale cache → Triggers external refresh → Returns refreshed prices.
+  - [ ] Test 3: `GET /api/platform/crypto-prices` with no cache rows → System fetches fresh from CoinGecko (mock the HTTP call in tests) → Prices stored in `ExternalPriceFeedCache` → Returns 7 coin prices.
+  - [ ] Test 4: CoinGecko API call fails (network error, mock timeout) → Service falls back to last known cached values → Response still returns data with `isStale: true` flag.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Schema] Add `ExternalPriceFeedCache` model to `prisma/schema.prisma`. Migration name: `--name add_external_price_feed_cache`. See `database_schema.md` for the full model definition.
+  - [ ] [Repository] `src/modules/market/repository/price-feed.repository.ts` — `upsertPrice(coinId, usdPrice)`, `findAllPrices()`, `findPriceByCoinId(coinId)`, `deleteStaleEntries(ttlSeconds)`.
+  - [ ] [Service] `src/modules/market/service/price-feed.service.ts` — `getOrRefreshPrices()`: checks all cached rows for staleness (> 60 seconds); if any stale, fetches `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,litecoin,ripple,dogecoin&vs_currencies=usd` via `node-fetch` / native `fetch`; upserts results into `ExternalPriceFeedCache`; returns full price map. On fetch failure, returns existing cache with `isStale: true`. Supported coins enum: `SUPPORTED_COIN_IDS = ["bitcoin", "ethereum", "solana", "binancecoin", "litecoin", "ripple", "dogecoin"]`.
+  - [ ] [Controller] `src/app/api/platform/crypto-prices/route.ts` — `GET` (no auth); calls `priceFeedService.getOrRefreshPrices()`; returns `{ prices: CoinPriceMap, fetchedAt: string, isStale: boolean }`.
+  - [ ] [Types] `src/types/market.ts` — `CoinId` (string literal union), `CoinPriceEntry { coinId, symbol, name, usdPrice, fetchedAt }`, `CryptoPricesResponse`.
+  - [ ] Run integration tests — **confirm GREEN.**
+
+- [ ] **RED — Unit (`src/tests/unit/price-feed.test.ts`):**
+  - [ ] Test: Given CC balance of `1000`, CC/USD rate of `0.25`, BTC price of `60000` → Computed BTC equivalent = `(1000 × 0.25) / 60000 = 0.00416667 BTC` (6 decimal places).
+  - [ ] Test: Given CC balance of `0` → All crypto equivalents = `0.00000000`.
+  - [ ] Test: Given CC/USD rate not set (null) → `computeConversions()` throws `RateNotConfiguredError`.
+  - [ ] Test: Given CoinGecko price of `0` for a coin → That coin's equivalent returns `Infinity`-guard → Returns `null` for that coin.
+  - [ ] Test: Conversion math uses `Decimal` arithmetic, not native floating point — assert `new Decimal(250).div(60000).toFixed(8) === "0.00416667"`.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Type] Finalize `src/types/market.ts` with all frontend-facing interfaces.
+  - [ ] [Component] `src/components/wallet/CryptoConversionCalculator.tsx`:
+    - CC Amount input field (default pre-filled with user's current available balance).
+    - Fetches `GET /api/platform/cc-usd-rate` and `GET /api/platform/crypto-prices` in parallel via SWR.
+    - Computes and renders a styled coin list: coin logo (use CoinGecko icon URL), coin name, symbol, and equivalent amount to 6 decimal places.
+    - Shows a `Last updated: X seconds ago` timestamp with a subtle refresh icon.
+    - Shows a `Powered by CoinGecko` attribution badge (required by CoinGecko free API terms).
+    - Shows an informational banner: _"Conversion rates are for reference only and reflect market prices. CC is not tradeable on external exchanges."_ — styled as a muted disclaimer, not a simulation warning.
+    - Gracefully handles: CC/USD rate not set (shows "Rate not configured" state), CoinGecko API down (shows stale data with warning chip), zero balance input.
+  - [ ] [Page] Update `src/app/(wallet)/wallet/page.tsx` to include `<CryptoConversionCalculator />` panel below the portfolio chart, within the same authenticated layout.
+  - [ ] Run unit tests — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Log in as `user@coincaret.com` → Navigate to `/wallet`.
+  - [ ] Admin has set CC/USD rate to `0.25`. User has `5,000 CC` available.
+  - [ ] Conversion Calculator panel shows: `BTC ≈ 0.000020 BTC`, `ETH ≈ 0.000390 ETH`, etc. (based on live CoinGecko prices).
+  - [ ] Change the CC amount input to `1000` → All values recompute instantly without page reload.
+  - [ ] Disconnect internet → Panel shows last-cached prices with a `Stale Data` chip rather than crashing.
+  - [ ] Admin updates CC/USD rate to `0.50` → User refreshes page → Conversion values double.
+  - [ ] ✅ Done.
+
+---
+
 ### Phase 7 — Full-Stack E2E Verification & Railway Deployment
 
 #### W-701 — End-to-End User & Network Lifecycle Playwright Test

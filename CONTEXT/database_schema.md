@@ -422,4 +422,70 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
+
+// --------------------------------------------------------
+// PLATFORM CONFIGURATION (W-603)
+// --------------------------------------------------------
+
+model PlatformConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g. "CC_USD_RATE", "MAINTENANCE_MODE"
+  value       String   // Always stored as String; parsed to correct type in service layer
+  description String?  // Human-readable description of the config key
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("platform_config")
+}
+
+// --------------------------------------------------------
+// EXTERNAL PRICE FEED CACHE (W-604)
+// --------------------------------------------------------
+
+model ExternalPriceFeedCache {
+  id        String   @id @default(uuid())
+  coinId    String   @unique // CoinGecko coin ID, e.g. "bitcoin", "ethereum", "solana"
+  symbol    String   // Ticker symbol, e.g. "BTC", "ETH"
+  name      String   // Display name, e.g. "Bitcoin", "Ethereum"
+  usdPrice  Decimal  @db.Decimal(28, 8) // Latest fetched USD price
+  fetchedAt DateTime // Timestamp of the last successful CoinGecko API fetch
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coinId])
+  @@index([fetchedAt])
+  @@map("external_price_feed_cache")
+}
 ```
+
+---
+
+## 3. Schema Migration History
+
+| Migration Name | Phase | Description |
+|:---|:---:|:---|
+| `20260916000000_init_coin_caret_schema` | 1 | Initial full schema: Users, Wallets, Ledger, Transactions, Blocks, Audit |
+| `add_platform_config` | 6 (W-603) | Adds `platform_config` key-value table for admin-controlled settings (CC/USD rate, etc.) |
+| `add_external_price_feed_cache` | 6 (W-604) | Adds `external_price_feed_cache` table for server-side CoinGecko API price caching with TTL |
+
+---
+
+## 4. Key Design Notes for New Models
+
+### `PlatformConfig`
+- **Storage Pattern:** All values stored as `String`. The `PlatformConfigService` is responsible for parsing and validating the appropriate type (e.g., converting `"0.25"` to `new Decimal("0.25")` for `CC_USD_RATE`).
+- **Write Access:** Only `PLATFORM_OWNER` and `FINANCE_OPERATOR` roles may write via `PATCH /api/admin/config`.
+- **Audit:** Every mutation to `PlatformConfig` must write a corresponding `AuditLog` row with `entityType: "PlatformConfig"`, `entityId: config.id`, `beforeState: { key, value }`, `afterState: { key, value }`.
+- **Known Keys at Launch:**
+
+| Key | Type | Description |
+|:---|:---|:---|
+| `CC_USD_RATE` | `Decimal > 0` | Admin-controlled USD value of 1 CC. Used for display-only USD equivalence. |
+
+### `ExternalPriceFeedCache`
+- **TTL Enforcement:** The `PriceFeedService` checks `fetchedAt` on every request. If `NOW() - fetchedAt > 60s`, the cache is considered stale and a fresh CoinGecko fetch is triggered.
+- **Stale Fallback:** If the CoinGecko API is unreachable, the service returns existing rows unchanged with `isStale: true` in the API response — the UI renders a `Stale Data` warning chip.
+- **Supported Coin IDs at Launch:** `bitcoin`, `ethereum`, `solana`, `binancecoin`, `litecoin`, `ripple`, `dogecoin`.
+- **Attribution Requirement:** The `GET /api/platform/crypto-prices` response and the `CryptoConversionCalculator.tsx` UI must include `Powered by CoinGecko` attribution per CoinGecko free API terms.
+- **No Ledger Impact:** This table is purely a read-through cache. No values from it ever flow into a `LedgerEntry`, balance derivation, or financial transaction.
+
