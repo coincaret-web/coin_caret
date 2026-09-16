@@ -108,6 +108,18 @@ dotenv -e .env.test -- npx prisma migrate deploy
 npm run db:seed
 ```
 
+### Pre-configured Seeded Demo Accounts
+
+Running `npm run db:seed` provisions institutional demo accounts with pre-funded native CC balances, cryptographic `CC0x...` addresses, and system ledger accounts:
+
+| Role | Email | Password | Initial Balance | Default CC Address | Notes |
+|:---|:---|:---|:---:|:---|:---|
+| **Institutional User** | `user@coincaret.com` | `Password123!` | **`5,000.00000000 CC`** | `CC0x7a89bc234def567890123456789abcdef0123456` | Pre-funded vault wallet with initial genesis allocation transaction |
+| **Platform Owner** | `admin@coincaret.com` | `AdminPassword123!` | *Sovereign Treasury* | N/A | Full administrative & treasury minting privileges |
+
+> [!TIP]
+> On the `/login` screen, you can also click the **"Demo User"** or **"Platform Owner"** buttons for one-click credential autofill.
+
 ---
 
 ## 5. Running the Application Locally

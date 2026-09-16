@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     // 1. Fetch total blocks sealed
@@ -44,7 +46,7 @@ export async function GET() {
         totalCredits += Number(entry.credit);
         totalDebits += Number(entry.debit);
       }
-      totalCirculatingDecimal = totalCredits - totalDebits;
+      totalCirculatingDecimal = totalDebits - totalCredits;
     }
 
     // Default formatting if supply is 0 or base mint

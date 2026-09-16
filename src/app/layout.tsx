@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SmoothScrollProvider } from "@/components/layout/SmoothScrollProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { JsonLd } from "@/components/seo/JsonLd";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -67,9 +68,11 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body className={`${inter.className} bg-[#0B0F17] text-slate-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-slate-950`}>
-        <SmoothScrollProvider>
-          {children}
-        </SmoothScrollProvider>
+        <AuthProvider>
+          <SmoothScrollProvider>
+            {children}
+          </SmoothScrollProvider>
+        </AuthProvider>
       </body>
     </html>
   );

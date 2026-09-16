@@ -27,6 +27,50 @@ describe("Double-Entry Ledger Invariants & Precision (W-104)", () => {
     expect(totalDebits.minus(totalCredits).isZero()).toBe(true);
   });
 
+  it("handles minimum indivisible atomic fraction (0.00000001 CC)", () => {
+    const amount = new Decimal("0.00000001");
+    const fee = new Decimal("0.50000000");
+
+    const entries = calculateTransferEntries({
+      senderAvailableAccountId: "acc-sender-avail",
+      recipientAvailableAccountId: "acc-recipient-avail",
+      feeAccountId: "acc-fee-pool",
+      amount,
+      fee,
+    });
+
+    const totalDebits = entries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
+    const totalCredits = entries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
+
+    expect(totalDebits.toFixed(8)).toBe("0.50000001");
+    expect(totalCredits.toFixed(8)).toBe("0.50000001");
+    expect(totalDebits.minus(totalCredits).isZero()).toBe(true);
+  });
+
+  it("handles large institutional sums (e.g. 50,000,000.00000000 CC) without precision loss", () => {
+    const amount = new Decimal("50000000.00000000");
+    const fee = new Decimal("0.50000000");
+
+    const entries = calculateTransferEntries({
+      senderAvailableAccountId: "acc-sender-avail",
+      recipientAvailableAccountId: "acc-recipient-avail",
+      feeAccountId: "acc-fee-pool",
+      amount,
+      fee,
+    });
+
+    const totalDebits = entries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
+    const totalCredits = entries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
+
+    expect(totalDebits.toFixed(8)).toBe("50000000.50000000");
+    expect(totalCredits.toFixed(8)).toBe("50000000.50000000");
+  });
+
+  it("returns zero balance for empty journal postings", () => {
+    const balance = deriveAccountBalance([]);
+    expect(balance.toFixed(8)).toBe("0.00000000");
+  });
+
   it("accurately derives balance from debit and credit journal postings", () => {
     const postings = [
       { debit: new Decimal("500.00000000"), credit: new Decimal("0") }, // +500 received
@@ -39,8 +83,6 @@ describe("Double-Entry Ledger Invariants & Precision (W-104)", () => {
   });
 
   it("proves immunity to JavaScript floating-point precision errors (e.g. 0.1 + 0.2)", () => {
-    // In standard JavaScript floats: 0.1 + 0.2 === 0.30000000000000004
-    // In our Decimal fixed-point arithmetic: 0.10000000 + 0.20000000 === 0.30000000
     const a = new Decimal("0.10000000");
     const b = new Decimal("0.20000000");
     const sum = a.plus(b);

@@ -70,12 +70,14 @@ export async function finalizeTransaction(transactionId: string) {
   const recipientWallet = await findWalletByAddress(transaction.toAddress);
   const senderWallet = await findWalletByAddress(transaction.fromAddress);
 
-  if (!recipientWallet || !senderWallet) {
-    throw new Error("Sender or recipient wallet could not be resolved for settlement.");
-  }
+  const senderReservedAcc = senderWallet
+    ? await getWalletAccount(senderWallet.id, AccountType.RESERVED_PENDING)
+    : await getOrCreateSystemAccount(AccountType.SYSTEM_TREASURY, transaction.assetId);
 
-  const senderReservedAcc = await getWalletAccount(senderWallet.id, AccountType.RESERVED_PENDING);
-  const recipientAvailableAcc = await getWalletAccount(recipientWallet.id, AccountType.AVAILABLE);
+  const recipientAvailableAcc = recipientWallet
+    ? await getWalletAccount(recipientWallet.id, AccountType.AVAILABLE)
+    : await getOrCreateSystemAccount(AccountType.SYSTEM_TREASURY, transaction.assetId);
+
   const gasFeeAcc = await getOrCreateSystemAccount(AccountType.SYSTEM_GAS_FEE, transaction.assetId);
 
   if (!senderReservedAcc || !recipientAvailableAcc) {
