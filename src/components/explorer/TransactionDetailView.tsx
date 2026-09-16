@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   ExternalLink,
 } from "lucide-react";
+import { ClientFormattedDate } from "@/components/common/ClientFormattedDate";
 
 interface TransactionDetailViewProps {
   tx: any;
@@ -184,7 +185,7 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
             Timestamp
           </span>
           <div className="sm:col-span-2 text-sm text-slate-300 font-mono">
-            {new Date(tx.createdAt).toUTCString()} ({new Date(tx.createdAt).toLocaleString()})
+            <ClientFormattedDate date={tx.createdAt} />
           </div>
         </div>
 

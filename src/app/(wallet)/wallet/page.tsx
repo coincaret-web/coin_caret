@@ -59,7 +59,11 @@ export default function WalletDashboardPage() {
       />
 
       {/* 2. Portfolio Performance Chart */}
-      <PortfolioChart currentBalance={parseFloat(total) || 1000} />
+      <PortfolioChart
+        currentBalance={total}
+        primaryAddress={address}
+        transactions={transactions}
+      />
 
       {/* 3. Recent Transactions Feed */}
       <RecentActivityTable

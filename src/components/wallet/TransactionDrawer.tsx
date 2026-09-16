@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { X, ExternalLink, ShieldCheck, Clock, CheckCircle2, Copy } from "lucide-react";
 import { TransactionSummaryItem } from "./RecentActivityTable";
@@ -11,11 +11,33 @@ interface TransactionDrawerProps {
 }
 
 export function TransactionDrawer({ transaction, onClose }: TransactionDrawerProps) {
+  // Close on Escape key press & prevent background scroll
+  useEffect(() => {
+    if (!transaction) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [transaction, onClose]);
+
   if (!transaction) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full p-6 sm:p-8 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-300 shadow-2xl">
+    <div
+      className="fixed inset-0 z-[100] flex justify-end bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-md bg-[#0B0F17] border-l border-slate-800 h-full p-6 sm:p-8 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-300 shadow-2xl">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -29,14 +51,15 @@ export function TransactionDrawer({ transaction, onClose }: TransactionDrawerPro
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              className="p-2 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-slate-800"
+              aria-label="Close receipt"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Amount Hero */}
-          <div className="p-6 rounded-2xl bg-slate-950/60 border border-slate-800 text-center">
+          <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">
               Settled Amount
             </span>
@@ -50,7 +73,7 @@ export function TransactionDrawer({ transaction, onClose }: TransactionDrawerPro
 
           {/* Granular Field List */}
           <div className="space-y-4 text-xs">
-            <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
+            <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80">
               <span className="text-slate-500 block text-[10px] uppercase font-semibold mb-1">
                 Transaction Hash
               </span>
@@ -59,7 +82,7 @@ export function TransactionDrawer({ transaction, onClose }: TransactionDrawerPro
               </span>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
+            <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80">
               <span className="text-slate-500 block text-[10px] uppercase font-semibold mb-1">
                 From Address
               </span>
@@ -68,7 +91,7 @@ export function TransactionDrawer({ transaction, onClose }: TransactionDrawerPro
               </span>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
+            <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80">
               <span className="text-slate-500 block text-[10px] uppercase font-semibold mb-1">
                 To Address
               </span>
@@ -78,7 +101,7 @@ export function TransactionDrawer({ transaction, onClose }: TransactionDrawerPro
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
+              <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80">
                 <span className="text-slate-500 block text-[10px] uppercase font-semibold mb-1">
                   Block Height
                 </span>
@@ -86,7 +109,7 @@ export function TransactionDrawer({ transaction, onClose }: TransactionDrawerPro
                   {transaction.blockHeight ? `#${transaction.blockHeight}` : "Pending Assignment"}
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
+              <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80">
                 <span className="text-slate-500 block text-[10px] uppercase font-semibold mb-1">
                   Confirmations
                 </span>

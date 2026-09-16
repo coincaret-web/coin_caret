@@ -516,11 +516,13 @@ This document is the authoritative single source of truth for the implementation
 - **Status:** Complete & Verified (100% Quality Gates Passed)
 - **Key Deliverables:**
   - Public Live Block Explorer (`/explorer`) featuring real-time 10s block stream (`LiveBlockFeed.tsx`), live transaction feed (`RecentTransactionsFeed.tsx`), network overview stats (`ExplorerStatsGrid.tsx`), and keyboard-activated universal search (`UniversalSearchBar.tsx`).
+  - Dedicated Paginated Stream Pages: Built `/explorer/blocks` and `/explorer/transactions` with full cryptographic metadata, table columns, and pagination controls (`?page=X`), resolving "View All" exploration paths with zero 404s.
   - Universal search engine recognizing 64/66-hex transaction hashes, 64-hex block hashes, block heights, and `CC0x...` checksummed addresses with instant routing.
   - Granular cryptographic transaction inspector (`/explorer/tx/[hash]`) featuring 3-tier settlement progress (Mempool ➔ Block Linked ➔ Ledger Finalized), raw JSON modal, and fee breakdowns.
   - Granular block inspector (`/explorer/block/[height]`) displaying SHA-256 block hash, parent block hash linking, synthetic Merkle tree root, and embedded transaction table.
   - Granular address portfolio inspector (`/explorer/address/[address]`) displaying SHA-256 checksum verification, available vs reserved balances, inflow vs outflow metrics, and activity history.
-  - Quality suite verified: 37/37 unit & component tests passing, 28/28 live PostgreSQL integration tests passing, 0 ESLint warnings, 0 TypeScript errors, clean Next.js production build across all 27 application routes.
+  - UI Layering & Drawer Hardening: Set `TransactionDrawer.tsx` to `z-[100]` with dark backdrop blur, outside-click dismissal, `Escape` key listener, and body scroll lock; set `WalletNavbar.tsx` to `z-40` with `shrink-0` flex guards to prevent navbar distortion or clipping when overlays open.
+  - Quality suite verified: 37/37 unit & component tests passing, 28/28 live PostgreSQL integration tests passing, 0 ESLint warnings, 0 TypeScript errors, clean Next.js production build across all 29 application routes.
 
 ---
 

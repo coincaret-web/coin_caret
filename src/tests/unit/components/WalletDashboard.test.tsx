@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { BalanceOverviewCard } from "@/components/wallet/BalanceOverviewCard";
 import { RecentActivityTable } from "@/components/wallet/RecentActivityTable";
+import { PortfolioChart } from "@/components/wallet/PortfolioChart";
 
 describe("Wallet Dashboard & Balance Derivations (W-401)", () => {
   it("renders Total Balance, Available, and Reserved Pending cards accurately", () => {
@@ -64,5 +65,42 @@ describe("Wallet Dashboard & Balance Derivations (W-401)", () => {
     expect(screen.getByText("25.50000000 CC")).toBeDefined();
     expect(screen.getByText("Confirmed (3/3)")).toBeDefined();
     expect(screen.getByText("Mempool (1/3)")).toBeDefined();
+  });
+
+  it("renders PortfolioChart with authentic ledger delta calculations", () => {
+    const userAddress = "CC0xUserWallet11111111111111111111111111";
+    const transactions = [
+      {
+        id: "tx-1",
+        amount: "200.00000000",
+        fee: "0.00050000",
+        toAddress: userAddress,
+        fromAddress: "CC0xTreasury22222222222222222222222222",
+        createdAt: "2026-09-16T22:17:01.000Z",
+        status: "CONFIRMED",
+      },
+      {
+        id: "tx-2",
+        amount: "500.00000000",
+        fee: "0.00050000",
+        toAddress: userAddress,
+        fromAddress: "CC0xTreasury22222222222222222222222222",
+        createdAt: "2026-09-16T22:26:21.000Z",
+        status: "CONFIRMED",
+      },
+    ];
+
+    render(
+      <PortfolioChart
+        currentBalance="705.00000000"
+        primaryAddress={userAddress}
+        transactions={transactions}
+      />
+    );
+
+    expect(screen.getByText(/24H Portfolio Performance/i)).toBeDefined();
+    expect(screen.getByText(/Real-time ledger asset valuation/i)).toBeDefined();
+    // Starting balance = 705 - 500 - 200 = 5 CC. Delta = ((705 - 5) / 5) * 100 = +14000.00%
+    expect(screen.getByText(/\+14000\.00% \(24h\)/)).toBeDefined();
   });
 });
