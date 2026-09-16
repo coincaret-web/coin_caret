@@ -10,8 +10,8 @@ This document is the authoritative single source of truth for the implementation
 - **Local Dev Port:** `3847` (IPv4 `127.0.0.1`)
 - **Dev Database:** `coin_caret_dev` (Port `5432` on `127.0.0.1`)
 - **Test Database:** `coin_caret_test` (Port `5433` on `127.0.0.1` via `.env.test`)
-- **Current Phase:** Phase 4 — Complete & Hardened (Ready for Phase 5)
-- **Overall Status:** Phase 4 Quality Gates Passed 100% (33/33 Unit Tests, 19/19 Live PostgreSQL Integration Tests Passing, Zero Lint/Type/Build Errors)
+- **Current Phase:** Phase 5 — Complete & Verified (Ready for Phase 6)
+- **Overall Status:** Phase 5 Quality Gates Passed 100% (37/37 Unit Tests, 28/28 Live PostgreSQL Integration Tests Passing, Zero Lint/Type/Build Errors)
 
 ---
 
@@ -23,7 +23,7 @@ This document is the authoritative single source of truth for the implementation
 [x] Phase 2: Blockchain Engine, Mempool & Background Block Worker
 [x] Phase 3: Public Marketing Portal, Motion & SEO Architecture
 [x] Phase 4: Web Wallet Application & Core Financial Workflows
-[ ] Phase 5: Live Block Explorer
+[x] Phase 5: Live Block Explorer
 [ ] Phase 6: Admin Command Center & Treasury Controls
 [ ] Phase 7: Full-Stack E2E Verification & Railway Deployment
 ```
@@ -478,17 +478,20 @@ This document is the authoritative single source of truth for the implementation
 #### W-501 — Real-Time Block Explorer Feed & Universal Search
 **Root cause:** Authentic transparency requires a public Explorer where anyone can search by Tx Hash, Address, or Block Height.
 **Goal:** Build `/explorer` with live block stream, recent transactions, and search bar.
-**Approach:** Server-rendered explorer with auto-refreshing SWR hook for new blocks.
+**Approach:** Server-rendered explorer with auto-refreshing polling hook for new blocks and transactions.
 
-- [ ] **RED — Integration (`src/tests/integration/explorer.integration.test.ts`):**
-  - [ ] Test: Query `/api/explorer/search?q=0x123...` -> Return matching transaction record; query `/api/explorer/blocks` -> Return latest sealed blocks.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Backend & Frontend:**
-  - [ ] [Controller] `src/app/api/explorer/search/route.ts` & `src/app/api/explorer/blocks/route.ts`
-  - [ ] [Component] `src/app/(explorer)/explorer/page.tsx`
-  - [ ] Run test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Navigate to `/explorer` → Live blocks tick every 10s → Paste Tx Hash into search bar → Instantly routes to transaction detail page → ✅ Done.
+- [x] **RED — Integration (`src/tests/integration/explorer.integration.test.ts`):**
+  - [x] Test: Query `/api/explorer/search?q=0x123...` -> Return matching transaction record; query `/api/explorer/blocks` -> Return latest sealed blocks.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Backend & Frontend:**
+  - [x] [Repository] `src/modules/explorer/repository/explorer.repository.ts`
+  - [x] [Service] `src/modules/explorer/service/explorer.service.ts`
+  - [x] [Controller] `src/app/api/explorer/search/route.ts` & `src/app/api/explorer/blocks/route.ts` & `src/app/api/explorer/transactions/route.ts` & `src/app/api/explorer/stats/route.ts`
+  - [x] [Components] `ExplorerNavbar.tsx`, `UniversalSearchBar.tsx`, `ExplorerStatsGrid.tsx`, `LiveBlockFeed.tsx`, `RecentTransactionsFeed.tsx`
+  - [x] [Page] `src/app/(explorer)/explorer/page.tsx`
+  - [x] Run test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Navigate to `/explorer` → Live blocks tick every 10s → Paste Tx Hash into search bar → Instantly routes to transaction detail page → ✅ Done.
 
 ---
 
@@ -497,16 +500,27 @@ This document is the authoritative single source of truth for the implementation
 **Goal:** Build all 3 explorer detail pages with complete cryptographic metadata.
 **Approach:** Next.js dynamic routes with server-side rendering for instant loading.
 
-- [ ] **RED — Integration (`src/tests/integration/explorer-details.integration.test.ts`):**
-  - [ ] Test: Fetch `/explorer/tx/0x...` -> Assert response contains confirmations count, gas used, from/to addresses, and block parent hash.
-  - [ ] **Run — confirm RED.**
-- [ ] **GREEN — Frontend:**
-  - [ ] Implement `src/app/(explorer)/explorer/tx/[hash]/page.tsx`
-  - [ ] Implement `src/app/(explorer)/explorer/block/[height]/page.tsx`
-  - [ ] Implement `src/app/(explorer)/explorer/address/[address]/page.tsx`
-  - [ ] Run test — **confirm GREEN.**
-- [ ] **Verification chain:**
-  - [ ] Click any transaction on Explorer → Opens clean URL `/explorer/tx/0x4f8a...` → Displays confirmation progress, gas fee, and block height → ✅ Done.
+- [x] **RED — Integration (`src/tests/integration/explorer-details.integration.test.ts`):**
+  - [x] Test: Fetch `/explorer/tx/0x...` -> Assert response contains confirmations count, gas used, from/to addresses, and block parent hash.
+  - [x] **Run — confirm RED.**
+- [x] **GREEN — Frontend & Backend:**
+  - [x] [Controller] `src/app/api/explorer/tx/[hash]/route.ts`, `src/app/api/explorer/block/[height]/route.ts`, `src/app/api/explorer/address/[address]/route.ts`
+  - [x] [Components] `TransactionDetailView.tsx`, `BlockDetailView.tsx`, `AddressDetailView.tsx`
+  - [x] [Pages] `src/app/(explorer)/explorer/tx/[hash]/page.tsx`, `src/app/(explorer)/explorer/block/[height]/page.tsx`, `src/app/(explorer)/explorer/address/[address]/page.tsx`
+  - [x] Run test — **confirm GREEN.**
+- [x] **Verification chain:**
+  - [x] Click any transaction on Explorer → Opens clean URL `/explorer/tx/0x4f8a...` → Displays confirmation progress, gas fee, and block height → ✅ Done.
+
+#### 📝 Session Note — Phase 5 Completion
+- **Date:** 2026-09-16
+- **Status:** Complete & Verified (100% Quality Gates Passed)
+- **Key Deliverables:**
+  - Public Live Block Explorer (`/explorer`) featuring real-time 10s block stream (`LiveBlockFeed.tsx`), live transaction feed (`RecentTransactionsFeed.tsx`), network overview stats (`ExplorerStatsGrid.tsx`), and keyboard-activated universal search (`UniversalSearchBar.tsx`).
+  - Universal search engine recognizing 64/66-hex transaction hashes, 64-hex block hashes, block heights, and `CC0x...` checksummed addresses with instant routing.
+  - Granular cryptographic transaction inspector (`/explorer/tx/[hash]`) featuring 3-tier settlement progress (Mempool ➔ Block Linked ➔ Ledger Finalized), raw JSON modal, and fee breakdowns.
+  - Granular block inspector (`/explorer/block/[height]`) displaying SHA-256 block hash, parent block hash linking, synthetic Merkle tree root, and embedded transaction table.
+  - Granular address portfolio inspector (`/explorer/address/[address]`) displaying SHA-256 checksum verification, available vs reserved balances, inflow vs outflow metrics, and activity history.
+  - Quality suite verified: 37/37 unit & component tests passing, 28/28 live PostgreSQL integration tests passing, 0 ESLint warnings, 0 TypeScript errors, clean Next.js production build across all 27 application routes.
 
 ---
 

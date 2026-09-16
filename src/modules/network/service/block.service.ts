@@ -48,42 +48,42 @@ export function computeBlockHash(header: {
  * Mints the next block, packaging up to maxTransactions from mempool.
  */
 export async function mintNextBlock(maxTransactions = 50) {
-  const latestBlock = await prisma.block.findFirst({
-    orderBy: { height: "desc" },
-  });
-
-  const nextHeight = latestBlock ? latestBlock.height + 1n : 1n;
-  const parentHash = latestBlock
-    ? latestBlock.blockHash
-    : "0x0000000000000000000000000000000000000000000000000000000000000000";
-
-  // 1. Fetch pending transactions from Mempool
-  const pendingTxs = await prisma.transaction.findMany({
-    where: {
-      status: {
-        in: [TransactionStatus.QUEUED, TransactionStatus.IN_MEMPOOL],
-      },
-    },
-    take: maxTransactions,
-    orderBy: { createdAt: "asc" },
-  });
-
-  const txHashes = pendingTxs.map((t) => t.txHash);
-  const merkleRoot = computeMerkleRoot(txHashes);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const blockHash = computeBlockHash({
-    height: nextHeight,
-    parentHash,
-    merkleRoot,
-    timestamp,
-  });
-
-  const totalGasUsed = pendingTxs.reduce(
-    (sum, tx) => sum.plus(new Decimal(tx.fee)),
-    new Decimal(0)
-  );
-
   return prisma.$transaction(async (tx) => {
+    const latestBlock = await tx.block.findFirst({
+      orderBy: { height: "desc" },
+    });
+
+    const nextHeight = latestBlock ? latestBlock.height + 1n : 1n;
+    const parentHash = latestBlock
+      ? latestBlock.blockHash
+      : "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+    // 1. Fetch pending transactions from Mempool
+    const pendingTxs = await tx.transaction.findMany({
+      where: {
+        status: {
+          in: [TransactionStatus.QUEUED, TransactionStatus.IN_MEMPOOL],
+        },
+      },
+      take: maxTransactions,
+      orderBy: { createdAt: "asc" },
+    });
+
+    const txHashes = pendingTxs.map((t) => t.txHash);
+    const merkleRoot = computeMerkleRoot(txHashes);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const blockHash = computeBlockHash({
+      height: nextHeight,
+      parentHash,
+      merkleRoot,
+      timestamp,
+    });
+
+    const totalGasUsed = pendingTxs.reduce(
+      (sum, t) => sum.plus(new Decimal(t.fee)),
+      new Decimal(0)
+    );
+
     // Create Block
     const block = await tx.block.create({
       data: {
