@@ -11,7 +11,8 @@ import {
   ShieldCheck, 
   ExternalLink,
   ChevronRight,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Users
 } from "lucide-react";
 
 export function AdminSidebar() {
@@ -29,6 +30,12 @@ export function AdminSidebar() {
       href: "/admin/network",
       icon: Activity,
       active: pathname === "/admin/network",
+    },
+    {
+      label: "Registered Users",
+      href: "/admin/users",
+      icon: Users,
+      active: pathname.startsWith("/admin/users"),
     },
     {
       label: "Treasury Issuance",

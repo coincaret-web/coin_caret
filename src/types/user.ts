@@ -72,3 +72,40 @@ export interface UserVerificationDto {
 }
 
 export type KycAccessStatus = "FULL_ACCESS" | "NEEDS_UPLOAD" | "AWAITING_REVIEW" | "REJECTED_REUPLOAD";
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  displayName: string;
+  phoneNumber?: string | null;
+  status: UserStatus;
+  kycRequired: boolean;
+  kycStatus: KycVerificationStatus | "NOT_SUBMITTED";
+  roles: string[];
+  createdAt: Date | string;
+}
+
+export interface AdminUserWallet {
+  id: string;
+  assetSymbol: string;
+  assetName: string;
+  address: string;
+  availableBalance: string;
+  reservedBalance: string;
+}
+
+export interface AdminUserDetail {
+  id: string;
+  email: string;
+  displayName: string;
+  phoneNumber?: string | null;
+  address?: string | null;
+  status: UserStatus;
+  kycRequired: boolean;
+  roles: string[];
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  verification?: UserVerificationDto | null;
+  wallets?: AdminUserWallet[];
+}
+
