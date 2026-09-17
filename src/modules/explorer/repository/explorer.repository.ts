@@ -5,6 +5,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 export interface PaginationParams {
   limit?: number;
   page?: number;
+  assetSymbol?: string;
 }
 
 export async function findLatestBlocks({ limit = 10, page = 1 }: PaginationParams = {}) {
@@ -24,17 +25,26 @@ export async function findLatestBlocks({ limit = 10, page = 1 }: PaginationParam
   return { blocks, totalBlocks, page: safePage, limit: safeLimit };
 }
 
-export async function findLatestTransactions({ limit = 10, page = 1 }: PaginationParams = {}) {
+export async function findLatestTransactions({ limit = 10, page = 1, assetSymbol }: PaginationParams = {}) {
   const safeLimit = Math.max(1, Math.min(limit, 50));
   const safePage = Math.max(1, page);
   const skip = (safePage - 1) * safeLimit;
 
+  const whereClause: Prisma.TransactionWhereInput = {};
+  if (assetSymbol && assetSymbol.trim() !== "") {
+    whereClause.asset = {
+      symbol: assetSymbol.trim().toUpperCase(),
+    };
+  }
+
   const [transactions, totalTransactions] = await Promise.all([
     prisma.transaction.findMany({
+      where: whereClause,
       skip,
       take: safeLimit,
       orderBy: { createdAt: "desc" },
       include: {
+        asset: true,
         block: {
           select: {
             height: true,
@@ -43,7 +53,7 @@ export async function findLatestTransactions({ limit = 10, page = 1 }: Paginatio
         },
       },
     }),
-    prisma.transaction.count(),
+    prisma.transaction.count({ where: whereClause }),
   ]);
 
   return { transactions, totalTransactions, page: safePage, limit: safeLimit };
@@ -55,11 +65,14 @@ export async function findBlockByHeight(height: bigint) {
     include: {
       blockTransactions: {
         include: {
-          transaction: true,
+          transaction: {
+            include: { asset: true },
+          },
         },
         orderBy: { txIndex: "asc" },
       },
       transactions: {
+        include: { asset: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -72,11 +85,14 @@ export async function findBlockByHash(blockHash: string) {
     include: {
       blockTransactions: {
         include: {
-          transaction: true,
+          transaction: {
+            include: { asset: true },
+          },
         },
         orderBy: { txIndex: "asc" },
       },
       transactions: {
+        include: { asset: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -87,6 +103,7 @@ export async function findTransactionByHash(txHash: string) {
   return prisma.transaction.findUnique({
     where: { txHash },
     include: {
+      asset: true,
       block: true,
       events: {
         orderBy: { createdAt: "asc" },
@@ -106,6 +123,7 @@ export async function findAddressRecord(address: string) {
     include: {
       wallet: {
         include: {
+          asset: true,
           user: {
             select: {
               displayName: true,
@@ -136,6 +154,7 @@ export async function findTransactionsByAddress(address: string, { limit = 20, p
       take: safeLimit,
       orderBy: { createdAt: "desc" },
       include: {
+        asset: true,
         block: {
           select: {
             height: true,
@@ -153,13 +172,18 @@ export async function findTransactionsByAddress(address: string, { limit = 20, p
   return { transactions, total, page: safePage, limit: safeLimit };
 }
 
-export async function getExplorerStatsSummary() {
+export async function getExplorerStatsSummary(assetSymbol?: string) {
+  const whereTx: Prisma.TransactionWhereInput = {};
+  if (assetSymbol && assetSymbol.trim() !== "") {
+    whereTx.asset = { symbol: assetSymbol.trim().toUpperCase() };
+  }
+
   const [latestBlock, totalBlocks, totalTransactions, gasAgg, activeWallets, availableEntries] = await Promise.all([
     prisma.block.findFirst({
       orderBy: { height: "desc" },
     }),
     prisma.block.count(),
-    prisma.transaction.count(),
+    prisma.transaction.count({ where: whereTx }),
     prisma.block.aggregate({
       _sum: {
         gasUsed: true,
@@ -170,6 +194,7 @@ export async function getExplorerStatsSummary() {
       where: {
         account: {
           accountType: AccountType.AVAILABLE,
+          ...(assetSymbol ? { asset: { symbol: assetSymbol.trim().toUpperCase() } } : {}),
         },
       },
       select: {
@@ -195,5 +220,6 @@ export async function getExplorerStatsSummary() {
     blockTimeSeconds: 10,
     activeAddresses: activeWallets,
     circulatingSupply: circulatingSupply.toFixed(8),
+    assetSymbol: assetSymbol || "ALL",
   };
 }

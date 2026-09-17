@@ -9,6 +9,7 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowLeftRight,
   Clock,
   LogOut,
   User,
@@ -36,8 +37,9 @@ export function WalletNavbar({ primaryAddress }: WalletNavbarProps) {
 
   const navLinks = [
     { label: "Dashboard", href: "/wallet", icon: Wallet },
-    { label: "Send CC", href: "/wallet/send", icon: ArrowUpRight },
-    { label: "Receive CC", href: "/wallet/receive", icon: ArrowDownLeft },
+    { label: "Swap", href: "/wallet/swap", icon: ArrowLeftRight },
+    { label: "Send", href: "/wallet/send", icon: ArrowUpRight },
+    { label: "Receive", href: "/wallet/receive", icon: ArrowDownLeft },
     { label: "Withdrawals", href: "/wallet/withdraw", icon: Clock },
   ];
 

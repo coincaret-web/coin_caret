@@ -5,7 +5,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const stats = await getExplorerStats();
+    const { searchParams } = new URL(request.url);
+    const asset = searchParams.get("asset") || undefined;
+    const stats = await getExplorerStats(asset);
     return NextResponse.json(stats, { status: 200 });
   } catch (error: any) {
     console.error("GET /api/explorer/stats error:", error);

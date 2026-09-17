@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { findUserByEmail, createUserWithRole } from "../repository/user.repository";
-import { createDefaultWallet } from "@/modules/wallets/service/wallet.service";
+import { provisionAllWalletsForUser } from "@/modules/wallets/service/wallet.service";
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -27,8 +27,9 @@ export async function registerUser(input: {
     displayName: input.displayName,
   });
 
-  // Auto-provision native CC wallet and ledger accounts
-  const wallet = await createDefaultWallet(user.id);
+  // Auto-provision all 8 multi-asset wallets and ledger accounts atomically
+  const wallets = await provisionAllWalletsForUser(user.id);
+  const primaryCcWallet = wallets.find((w) => w.asset.symbol === "CC") || wallets[0];
 
   return {
     user: {
@@ -38,8 +39,13 @@ export async function registerUser(input: {
       role: user.roles[0]?.role?.name ?? "USER",
     },
     wallet: {
-      id: wallet.id,
-      address: wallet.addresses[0]?.address,
+      id: primaryCcWallet.id,
+      address: primaryCcWallet.addresses[0]?.address,
     },
+    wallets: wallets.map((w) => ({
+      id: w.id,
+      assetSymbol: w.asset.symbol,
+      address: w.addresses[0]?.address,
+    })),
   };
 }

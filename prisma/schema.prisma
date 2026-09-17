@@ -42,6 +42,7 @@ enum AccountType {
 enum TransactionType {
   TRANSFER
   TREASURY_MINT
+  SWAP
   WITHDRAWAL
   GAS_FEE
   ADMIN_ADJUSTMENT
@@ -99,6 +100,7 @@ model User {
   issuanceRequests  TreasuryIssuanceRequest[] @relation("RequestedIssuances")
   approvedIssuances TreasuryIssuanceRequest[] @relation("ApprovedIssuances")
   platformConfigs   PlatformConfig[]
+  assetPairRates    AssetPairRate[]
 
   @@map("users")
 }
@@ -184,6 +186,8 @@ model Asset {
   wallets           Wallet[]
   ledgerAccounts    LedgerAccount[]
   transactions      Transaction[]
+  fromPairRates     AssetPairRate[] @relation("FromAssetRates")
+  toPairRates       AssetPairRate[] @relation("ToAssetRates")
 
   @@map("assets")
 }
@@ -275,6 +279,9 @@ model Transaction {
   blockHeight       BigInt?
   confirmations     Int                @default(0)
   note              String?
+  linkedTransactionId String?
+  linkedTransaction   Transaction?     @relation("LinkedSwapTransaction", fields: [linkedTransactionId], references: [id])
+  linkedByTransactions Transaction[]   @relation("LinkedSwapTransaction")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -432,5 +439,23 @@ model ExternalPriceFeedCache {
 
   @@index([coinId])
   @@map("external_price_feed_cache")
+}
+
+model AssetPairRate {
+  id                String             @id @default(uuid())
+  fromAssetId       String
+  fromAsset         Asset              @relation("FromAssetRates", fields: [fromAssetId], references: [id], onDelete: Cascade)
+  toAssetId         String
+  toAsset           Asset              @relation("ToAssetRates", fields: [toAssetId], references: [id], onDelete: Cascade)
+  rate              Decimal            @db.Decimal(28, 8)
+  setByUserId       String?
+  setByUser         User?              @relation(fields: [setByUserId], references: [id], onDelete: SetNull)
+  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime           @default(now())
+
+  @@unique([fromAssetId, toAssetId])
+  @@index([fromAssetId])
+  @@index([toAssetId])
+  @@map("asset_pair_rates")
 }
 

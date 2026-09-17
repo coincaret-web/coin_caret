@@ -8,11 +8,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
     const pageParam = searchParams.get("page");
+    const assetParam = searchParams.get("asset");
 
     const limit = limitParam ? parseInt(limitParam, 10) : 10;
     const page = pageParam ? parseInt(pageParam, 10) : 1;
+    const assetSymbol = assetParam ? assetParam.trim() : undefined;
 
-    const data = await getTransactions({ limit, page });
+    const data = await getTransactions({ limit, page, assetSymbol });
     return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
     console.error("GET /api/explorer/transactions error:", error);

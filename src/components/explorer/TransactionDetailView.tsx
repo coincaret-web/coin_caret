@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ClientFormattedDate } from "@/components/common/ClientFormattedDate";
+import { AssetBadge } from "./AssetBadge";
 
 interface TransactionDetailViewProps {
   tx: any;
@@ -32,6 +33,7 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
 
   const confirmations = tx.confirmations || 0;
   const isFinalized = tx.status === "CONFIRMED" || confirmations >= 3;
+  const assetSymbol = tx.assetSymbol || "CC";
 
   return (
     <div className="space-y-6">
@@ -67,6 +69,7 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
             <div className="flex items-center space-x-2 text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1">
               <ShieldCheck className="w-4 h-4" />
               <span>Verified On-Chain Transaction</span>
+              <AssetBadge symbol={assetSymbol} size="sm" />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white font-mono break-all">
               {tx.txHash}
@@ -159,6 +162,16 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
           </div>
         </div>
 
+        {/* Asset */}
+        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Asset Currency
+          </span>
+          <div className="sm:col-span-2">
+            <AssetBadge symbol={assetSymbol} size="md" />
+          </div>
+        </div>
+
         {/* Block Height */}
         <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -246,7 +259,7 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
           </span>
           <div className="sm:col-span-2">
             <span className="text-lg font-black text-white font-mono">
-              {tx.amount} CC
+              {tx.amount} {assetSymbol}
             </span>
           </div>
         </div>
@@ -257,7 +270,7 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
             Network Gas Fee
           </span>
           <div className="sm:col-span-2 text-sm text-slate-300 font-mono">
-            {tx.fee} CC
+            {tx.fee} {assetSymbol}
           </div>
         </div>
 
@@ -267,7 +280,7 @@ export function TransactionDetailView({ tx }: TransactionDetailViewProps) {
             Total Sender Debit
           </span>
           <div className="sm:col-span-2 text-sm font-bold text-white font-mono">
-            {tx.totalDebit} CC
+            {tx.totalDebit} {assetSymbol}
           </div>
         </div>
 

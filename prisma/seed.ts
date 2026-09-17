@@ -27,55 +27,88 @@ async function main() {
     });
   }
 
-  // 2. Ensure Native CC Asset exists
-  const asset = await prisma.asset.upsert({
-    where: { symbol: "CC" },
-    update: {},
-    create: {
-      symbol: "CC",
-      name: "Coin Caret Native Currency",
-      type: "NATIVE_COIN",
-      decimals: 8,
-      isActive: true,
-    },
-  });
+  // 2. Ensure all 8 Supported Assets exist and have system accounts
+  const supportedAssetDefs = [
+    { symbol: "CC", name: "Coin Caret Native Currency", type: "NATIVE_COIN" as const, decimals: 8 },
+    { symbol: "BTC", name: "Bitcoin", type: "TOKEN" as const, decimals: 8 },
+    { symbol: "ETH", name: "Ethereum", type: "TOKEN" as const, decimals: 18 },
+    { symbol: "SOL", name: "Solana", type: "TOKEN" as const, decimals: 9 },
+    { symbol: "BNB", name: "BNB", type: "TOKEN" as const, decimals: 18 },
+    { symbol: "LTC", name: "Litecoin", type: "TOKEN" as const, decimals: 8 },
+    { symbol: "XRP", name: "XRP", type: "TOKEN" as const, decimals: 6 },
+    { symbol: "DOGE", name: "Dogecoin", type: "TOKEN" as const, decimals: 8 },
+  ];
 
-  // 3. Ensure System Treasury & Fee Accounts exist (walletId: null)
-  let treasuryAcc = await prisma.ledgerAccount.findFirst({
-    where: {
-      walletId: null,
-      accountType: AccountType.SYSTEM_TREASURY,
-      assetId: asset.id,
-    },
-  });
+  let nativeCcAsset: any = null;
+  let treasuryAcc: any = null;
+  let gasFeeAcc: any = null;
 
-  if (!treasuryAcc) {
-    treasuryAcc = await prisma.ledgerAccount.create({
-      data: {
+  for (const aDef of supportedAssetDefs) {
+    const createdAsset = await prisma.asset.upsert({
+      where: { symbol: aDef.symbol },
+      update: {
+        name: aDef.name,
+        decimals: aDef.decimals,
+        type: aDef.type,
+        isActive: true,
+      },
+      create: {
+        symbol: aDef.symbol,
+        name: aDef.name,
+        decimals: aDef.decimals,
+        type: aDef.type,
+        isActive: true,
+      },
+    });
+
+    if (aDef.symbol === "CC") {
+      nativeCcAsset = createdAsset;
+    }
+
+    // 3. Ensure System Treasury & Fee Accounts exist for each asset
+    let tAcc = await prisma.ledgerAccount.findFirst({
+      where: {
         walletId: null,
         accountType: AccountType.SYSTEM_TREASURY,
-        assetId: asset.id,
+        assetId: createdAsset.id,
       },
     });
-  }
 
-  let gasFeeAcc = await prisma.ledgerAccount.findFirst({
-    where: {
-      walletId: null,
-      accountType: AccountType.SYSTEM_GAS_FEE,
-      assetId: asset.id,
-    },
-  });
+    if (!tAcc) {
+      tAcc = await prisma.ledgerAccount.create({
+        data: {
+          walletId: null,
+          accountType: AccountType.SYSTEM_TREASURY,
+          assetId: createdAsset.id,
+        },
+      });
+    }
 
-  if (!gasFeeAcc) {
-    gasFeeAcc = await prisma.ledgerAccount.create({
-      data: {
+    let gAcc = await prisma.ledgerAccount.findFirst({
+      where: {
         walletId: null,
         accountType: AccountType.SYSTEM_GAS_FEE,
-        assetId: asset.id,
+        assetId: createdAsset.id,
       },
     });
+
+    if (!gAcc) {
+      gAcc = await prisma.ledgerAccount.create({
+        data: {
+          walletId: null,
+          accountType: AccountType.SYSTEM_GAS_FEE,
+          assetId: createdAsset.id,
+        },
+      });
+    }
+
+    if (aDef.symbol === "CC") {
+      treasuryAcc = tAcc;
+      gasFeeAcc = gAcc;
+    }
   }
+
+  const asset = nativeCcAsset;
 
   // 4. Create Platform Owner (Admin)
   const adminEmail = "admin@coincaret.com";
@@ -212,6 +245,30 @@ async function main() {
     });
 
     console.log("💰 Funded user@coincaret.com with 5,000.00000000 CC!");
+  }
+
+  // 6. Ensure Network Fee Settings exist for all assets
+  const feeDefaults = [
+    { key: "FEE_CC", value: "0.50", desc: "Coin Caret transfer fee" },
+    { key: "FEE_BTC", value: "0.000015", desc: "Bitcoin network transfer fee" },
+    { key: "FEE_ETH", value: "0.0005", desc: "Ethereum network transfer fee" },
+    { key: "FEE_SOL", value: "0.0005", desc: "Solana network transfer fee" },
+    { key: "FEE_BNB", value: "0.0005", desc: "BNB Chain transfer fee" },
+    { key: "FEE_LTC", value: "0.001", desc: "Litecoin transfer fee" },
+    { key: "FEE_XRP", value: "0.1", desc: "Ripple transfer fee" },
+    { key: "FEE_DOGE", value: "1.0", desc: "Dogecoin transfer fee" },
+  ];
+
+  for (const feeDef of feeDefaults) {
+    await prisma.networkSetting.upsert({
+      where: { key: feeDef.key },
+      update: {},
+      create: {
+        key: feeDef.key,
+        value: feeDef.value,
+        description: feeDef.desc,
+      },
+    });
   }
 
   console.log("✅ Coin Caret Database Seeding Completed Successfully.");

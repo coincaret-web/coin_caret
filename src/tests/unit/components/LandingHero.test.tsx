@@ -6,26 +6,28 @@ import { LiveNetworkStats } from "@/components/marketing/LiveNetworkStats";
 import { FeatureGrid } from "@/components/marketing/FeatureGrid";
 
 describe("Landing Page & Hero Component (W-301)", () => {
-  it("renders the main hero heading and luxury brand elements", () => {
-    render(<HomePage />);
+  it("renders the main hero heading and luxury brand elements", async () => {
+    const page = await HomePage();
+    render(page);
     
     // Brand title and acronym
     const brandElements = screen.getAllByText("COIN CARET");
     expect(brandElements.length).toBeGreaterThanOrEqual(1);
     
     // Core value proposition
-    expect(screen.getByText(/The Digital Currency Engine Built for/i)).toBeDefined();
-    expect(screen.getByText(/Speed and Precision/i)).toBeDefined();
+    expect(screen.getByText(/The Multi-Currency Engine Built for/i)).toBeDefined();
+    expect(screen.getByText(/Trading & Settlement Precision/i)).toBeDefined();
     
-    // Call to Action buttons
-    expect(screen.getByRole("button", { name: /Open CC Wallet/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /Live Block Explorer/i })).toBeDefined();
+    // Call to Action links
+    expect(screen.getByText(/Open Web Wallet/i)).toBeDefined();
+    expect(screen.getAllByText(/Block Explorer/i).length).toBeGreaterThan(0);
   });
 
-  it("renders the live network status indicator badge", () => {
-    render(<HomePage />);
-    expect(screen.getByText(/Coin Caret Mainnet Active/i)).toBeDefined();
-    expect(screen.getByText(/Block Interval 10.0s/i)).toBeDefined();
+  it("renders the live network status indicator badge", async () => {
+    const page = await HomePage();
+    render(page);
+    expect(screen.getByText(/Coin Caret Multi-Asset Mainnet Active/i)).toBeDefined();
+    expect(screen.getByText(/8 Currencies Supported/i)).toBeDefined();
   });
 
   it("renders the LiveNetworkStats component with core blockchain metrics", () => {

@@ -47,6 +47,7 @@ export function serializeTransaction(tx: any) {
     type: tx.type,
     status: tx.status,
     assetId: tx.assetId,
+    assetSymbol: tx.asset?.symbol || "CC",
     initiatorUserId: tx.initiatorUserId,
     fromAddress: tx.fromAddress,
     toAddress: tx.toAddress,
@@ -151,6 +152,7 @@ export async function getAddressDetails(address: string, pagination: PaginationP
     address: trimmed,
     isValidChecksum: validateAddressChecksum(trimmed),
     displayName: addressRecord?.wallet?.user?.displayName || "External Address",
+    assetSymbol: addressRecord?.wallet?.asset?.symbol || "CC",
     balances: {
       available: availableBalance.toFixed(8),
       reserved: reservedBalance.toFixed(8),
@@ -189,8 +191,8 @@ export async function resolveUniversalSearch(query: string) {
     }
   }
 
-  // 2. Check if Address (starts with CC0x or cc0x)
-  if (/^CC0x[a-fA-F0-9]{40}$/i.test(clean)) {
+  // 2. Check if Address (starts with [SYMBOL]0x)
+  if (/^[A-Z0-9]{2,6}0x[a-fA-F0-9]{40}$/i.test(clean)) {
     const addr = await findAddressRecord(clean);
     const txs = await findTransactionsByAddress(clean, { limit: 1 });
     if (addr || txs.total > 0 || validateAddressChecksum(clean)) {
@@ -229,6 +231,6 @@ export async function resolveUniversalSearch(query: string) {
   return { found: false, error: "No matching block, transaction, or address found" };
 }
 
-export async function getExplorerStats() {
-  return getExplorerStatsSummary();
+export async function getExplorerStats(assetSymbol?: string) {
+  return getExplorerStatsSummary(assetSymbol);
 }

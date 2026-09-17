@@ -46,10 +46,12 @@ describe("Live Identity, Auth & RBAC Database Integration (W-102)", () => {
     const isPasswordValid = await verifyPassword("StrongPassword123!", dbUser!.passwordHash);
     expect(isPasswordValid).toBe(true);
 
-    // Verify wallet in DB
-    expect(dbUser?.wallets).toHaveLength(1);
-    expect(dbUser?.wallets[0].addresses[0].address).toBe(result.wallet.address);
-    expect(dbUser?.wallets[0].ledgerAccounts.length).toBeGreaterThanOrEqual(2); // AVAILABLE + RESERVED
+    // Verify wallets in DB (multi-asset: 8 wallets provisioned)
+    expect(dbUser?.wallets.length).toBeGreaterThanOrEqual(1);
+    const ccWallet = dbUser?.wallets.find((w) => w.addresses[0]?.address.startsWith("CC0x"));
+    expect(ccWallet).toBeDefined();
+    expect(ccWallet?.addresses[0].address).toBe(result.wallet.address);
+    expect(ccWallet?.ledgerAccounts.length).toBeGreaterThanOrEqual(2); // AVAILABLE + RESERVED
   });
 
   it("prevents registering duplicate email addresses in PostgreSQL", async () => {

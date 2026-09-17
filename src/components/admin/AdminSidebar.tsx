@@ -10,7 +10,8 @@ import {
   FileText, 
   ShieldCheck, 
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ArrowLeftRight
 } from "lucide-react";
 
 export function AdminSidebar() {
@@ -34,6 +35,12 @@ export function AdminSidebar() {
       href: "/admin/treasury",
       icon: Coins,
       active: pathname === "/admin/treasury",
+    },
+    {
+      label: "Exchange Rates",
+      href: "/admin/exchange-rates",
+      icon: ArrowLeftRight,
+      active: pathname === "/admin/exchange-rates",
     },
     {
       label: "Platform Settings",

@@ -37,13 +37,13 @@ export async function POST(req: NextRequest) {
 
     if (!userId || !hasPermission(role, "admin:treasury:mint")) {
       return NextResponse.json(
-        { error: "Forbidden: insufficient permissions to mint treasury CC." },
+        { error: "Forbidden: insufficient permissions to mint treasury assets." },
         { status: 403 }
       );
     }
 
     const body = await req.json();
-    const { recipientWalletId, amount, reason } = body;
+    const { recipientWalletId, amount, reason, assetSymbol } = body;
 
     if (!recipientWalletId || !amount) {
       return NextResponse.json(
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       reason: reason || "Administrative Treasury Issuance",
       actorUserId: userId,
       ipAddress: clientIp,
+      assetSymbol,
     });
 
     return NextResponse.json(result, { status: 200 });

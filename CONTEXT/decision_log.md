@@ -155,3 +155,22 @@ This document tracks all foundational architectural, financial, infrastructure, 
   - **Browser-direct CoinGecko fetch:** Exposes rate limit tokens to clients, blocked by CORS in some environments, and cannot implement server-side stale fallback.
   - **CoinMarketCap API:** Requires mandatory API key even at free tier; adds credential management overhead.
   - **Binance Public Ticker:** More complex response format; not all 7 coins have identical ticker IDs, increasing mapping fragility.
+
+---
+
+## ADR-012: Multi-Currency Platform Architecture & Atomic Internal Swap Engine
+
+- **Date:** 2026-09-17
+- **Status:** APPROVED
+- **Context:** To expand Coin Caret into a full multi-currency institutional ecosystem, users require dedicated wallets for 8 supported cryptocurrencies (`CC`, `BTC`, `ETH`, `SOL`, `BNB`, `LTC`, `XRP`, `DOGE`) and the ability to trade/swap between them internally with instant settlement.
+- **Decision:** 
+  1. **Per-Asset Wallet Provisioning:** Automatically create 8 distinct wallets and 16 double-entry ledger accounts (`AVAILABLE` and `RESERVED_PENDING`) per user at registration. Addresses use asset-specific prefixing (`BTC0x...`, `ETH0x...`, `CC0x...`) with SHA-256 mixed-case checksum verification.
+  2. **Exchange Rate Matrix (`AssetPairRate`):** Store admin-controlled pair rates in an `asset_pair_rates` table. When no manual override exists for a pair, dynamically derive the cross-rate via the CoinGecko price cache: `(fromUsdPrice / toUsdPrice)`.
+  3. **Atomic Dual-Leg Swap Engine:** Execute internal swaps within a single `prisma.$transaction` creating linked `Transaction` records (Type: `SWAP`) and posting balanced ledger entries across both asset accounts (debit source, credit source fee, credit target, credit treasury swap fee).
+- **Rationale:**
+  - **Zero Simulation Watermarks:** Users experience an authentic, high-end Web3 multi-asset trading platform with real-time conversion previews, price impact notices, and live block confirmations.
+  - **Strict Ledger Invariance:** All trades respect double-entry bookkeeping ($\sum \text{Debits} == \sum \text{Credits}$) with `Decimal(28, 8)` precision.
+  - **Institutional Control:** Admins retain full control over specific pair rates, treasury minting, and fee schedules per asset.
+- **Alternatives Rejected:**
+  - **External DEX Integration (Uniswap/Raydium):** Requires real liquidity pools and blockchain gas funding; introduces latency and slippage unsuited for an internal institutional platform.
+  - **Single Mixed Wallet Account:** Blending different assets into a single ledger account violates accounting normalization and makes per-asset balance auditing error-prone.

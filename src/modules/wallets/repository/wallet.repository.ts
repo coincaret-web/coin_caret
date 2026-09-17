@@ -1,16 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { AccountType } from "@prisma/client";
+import { AccountType, Prisma } from "@prisma/client";
 
-export async function getOrCreateNativeAsset() {
-  let asset = await prisma.asset.findUnique({
+export async function getOrCreateNativeAsset(db: Prisma.TransactionClient | typeof prisma = prisma) {
+  let asset = await db.asset.findUnique({
     where: { symbol: "CC" },
   });
 
   if (!asset) {
-    asset = await prisma.asset.create({
+    asset = await db.asset.create({
       data: {
         symbol: "CC",
-        name: "Coin Caret",
+        name: "Coin Caret Native Currency",
         decimals: 8,
         isActive: true,
       },
@@ -20,14 +20,27 @@ export async function getOrCreateNativeAsset() {
   return asset;
 }
 
-export async function provisionWallet(userId: string, address: string) {
-  const asset = await getOrCreateNativeAsset();
+export async function provisionWallet(
+  userId: string,
+  address: string,
+  assetId?: string,
+  label?: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma
+) {
+  let targetAssetId = assetId;
+  let targetLabel = label;
 
-  return prisma.wallet.create({
+  if (!targetAssetId) {
+    const defaultAsset = await getOrCreateNativeAsset(db);
+    targetAssetId = defaultAsset.id;
+    if (!targetLabel) targetLabel = "Main CC Wallet";
+  }
+
+  return db.wallet.create({
     data: {
       userId,
-      assetId: asset.id,
-      label: "Main CC Wallet",
+      assetId: targetAssetId,
+      label: targetLabel || "Vault Wallet",
       addresses: {
         create: {
           address,
@@ -37,11 +50,11 @@ export async function provisionWallet(userId: string, address: string) {
       ledgerAccounts: {
         create: [
           {
-            assetId: asset.id,
+            assetId: targetAssetId,
             accountType: AccountType.AVAILABLE,
           },
           {
-            assetId: asset.id,
+            assetId: targetAssetId,
             accountType: AccountType.RESERVED_PENDING,
           },
         ],
@@ -50,6 +63,7 @@ export async function provisionWallet(userId: string, address: string) {
     include: {
       addresses: true,
       ledgerAccounts: true,
+      asset: true,
     },
   });
 }

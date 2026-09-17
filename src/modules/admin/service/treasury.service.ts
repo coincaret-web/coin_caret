@@ -8,6 +8,7 @@ export interface TreasuryMintInput {
   reason: string;
   actorUserId?: string;
   ipAddress?: string;
+  assetSymbol?: string;
 }
 
 export async function executeTreasuryMint(input: TreasuryMintInput) {
@@ -22,13 +23,20 @@ export async function executeTreasuryMint(input: TreasuryMintInput) {
 
   const wallet = await prisma.wallet.findUnique({
     where: { id: input.recipientWalletId },
-    include: { addresses: true, user: true },
+    include: { addresses: true, user: true, asset: true },
   });
 
   if (!wallet) {
     throw new Error("Recipient wallet could not be found.");
   }
 
+  if (input.assetSymbol && wallet.asset.symbol !== input.assetSymbol.toUpperCase()) {
+    throw new Error(
+      `Asset symbol mismatch for target wallet. Target wallet is ${wallet.asset.symbol}, requested ${input.assetSymbol}.`
+    );
+  }
+
+  const targetAssetSymbol = wallet.asset.symbol;
   const initialBalance = await getWalletBalance(wallet.id);
 
   // 1. Post atomic treasury ledger transaction
@@ -63,11 +71,13 @@ export async function executeTreasuryMint(input: TreasuryMintInput) {
       entityId: issuance.id,
       beforeState: {
         walletId: wallet.id,
+        assetSymbol: targetAssetSymbol,
         userEmail: wallet.user?.email || null,
         availableBalance: initialBalance.available.toFixed(8),
       },
       afterState: {
         walletId: wallet.id,
+        assetSymbol: targetAssetSymbol,
         userEmail: wallet.user?.email || null,
         amount: amountDecimal.toFixed(8),
         availableBalance: finalBalance.available.toFixed(8),
@@ -83,6 +93,7 @@ export async function executeTreasuryMint(input: TreasuryMintInput) {
     transactionId: tx.id,
     txHash: tx.txHash,
     issuanceId: issuance.id,
+    assetSymbol: targetAssetSymbol,
     newBalance: finalBalance.available.toFixed(8),
   };
 }

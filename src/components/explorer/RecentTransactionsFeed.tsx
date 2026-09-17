@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ArrowUpRight, CheckCircle2, Clock, ChevronRight, Hash } from "lucide-react";
+import { AssetBadge } from "./AssetBadge";
+import { AssetFilterBar } from "./AssetFilterBar";
 
 export interface ExplorerTransaction {
   id: string;
@@ -11,6 +13,7 @@ export interface ExplorerTransaction {
   toAddress: string;
   amount: string;
   fee: string;
+  assetSymbol?: string;
   status: string;
   confirmations: number;
   createdAt: string;
@@ -18,16 +21,21 @@ export interface ExplorerTransaction {
 
 interface RecentTransactionsFeedProps {
   initialTransactions: ExplorerTransaction[];
+  showFilter?: boolean;
 }
 
-export function RecentTransactionsFeed({ initialTransactions }: RecentTransactionsFeedProps) {
+export function RecentTransactionsFeed({ initialTransactions, showFilter = true }: RecentTransactionsFeedProps) {
   const [transactions, setTransactions] = useState<ExplorerTransaction[]>(initialTransactions);
+  const [selectedAsset, setSelectedAsset] = useState<string>("");
 
   // Auto-refresh transactions every 6 seconds
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const fetchTx = async () => {
       try {
-        const res = await fetch("/api/explorer/transactions?limit=10");
+        const url = selectedAsset
+          ? `/api/explorer/transactions?limit=10&asset=${encodeURIComponent(selectedAsset)}`
+          : "/api/explorer/transactions?limit=10";
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (data.transactions) {
@@ -37,10 +45,12 @@ export function RecentTransactionsFeed({ initialTransactions }: RecentTransactio
       } catch (err) {
         // silent fail on polling error
       }
-    }, 6000);
+    };
 
+    fetchTx();
+    const interval = setInterval(fetchTx, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedAsset]);
 
   const formatHash = (hash: string) => {
     if (!hash || hash.length <= 16) return hash;
@@ -97,7 +107,7 @@ export function RecentTransactionsFeed({ initialTransactions }: RecentTransactio
           </div>
           <div>
             <h3 className="font-bold text-base text-white">Latest Transactions</h3>
-            <p className="text-xs text-slate-400">Verified transfer and minting activity</p>
+            <p className="text-xs text-slate-400">Multi-asset transfer and minting activity</p>
           </div>
         </div>
         <div className="flex items-center space-x-1 text-xs text-emerald-400 font-mono">
@@ -106,12 +116,22 @@ export function RecentTransactionsFeed({ initialTransactions }: RecentTransactio
         </div>
       </div>
 
+      {/* Asset Filter Bar */}
+      {showFilter && (
+        <div className="pt-3 pb-1 border-b border-slate-800/40">
+          <AssetFilterBar
+            selectedAsset={selectedAsset}
+            onSelectAsset={(sym) => setSelectedAsset(sym)}
+          />
+        </div>
+      )}
+
       {/* Transaction List */}
       <div className="divide-y divide-slate-800/60 flex-1 overflow-y-auto mt-2 -mx-2 px-2">
         {transactions.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-sm">
             <Hash className="w-8 h-8 mx-auto mb-2 opacity-40 animate-pulse" />
-            No recent transactions found.
+            No recent transactions found {selectedAsset ? `for ${selectedAsset}` : ""}.
           </div>
         ) : (
           transactions.map((tx) => (
@@ -133,6 +153,7 @@ export function RecentTransactionsFeed({ initialTransactions }: RecentTransactio
                       <span>{formatHash(tx.txHash)}</span>
                       <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
+                    <AssetBadge symbol={tx.assetSymbol || "CC"} size="sm" />
                     {getStatusBadge(tx.status, tx.confirmations)}
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1 font-mono">
@@ -157,7 +178,7 @@ export function RecentTransactionsFeed({ initialTransactions }: RecentTransactio
 
               <div className="text-right shrink-0">
                 <div className="text-sm font-black text-white font-mono">
-                  {tx.amount} CC
+                  {tx.amount} {tx.assetSymbol || "CC"}
                 </div>
                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                   {timeAgo(tx.createdAt)}
@@ -171,10 +192,10 @@ export function RecentTransactionsFeed({ initialTransactions }: RecentTransactio
       {/* Footer */}
       <div className="pt-3 mt-auto border-t border-slate-800/60">
         <Link
-          href="/explorer/transactions"
+          href={`/explorer/transactions${selectedAsset ? `?asset=${selectedAsset}` : ""}`}
           className="w-full py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center space-x-1 transition-colors border border-slate-700/50"
         >
-          <span>View All Transactions</span>
+          <span>View All Transactions {selectedAsset ? `(${selectedAsset})` : ""}</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>

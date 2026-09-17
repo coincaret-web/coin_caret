@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Treasury Issuance | Coin Caret Admin",
-  description: "Mint CC tokens directly into client accounts with strict audit logging.",
+  description: "Mint supported cryptocurrency tokens directly into client accounts with strict audit logging.",
 };
 
 export default async function AdminTreasuryPage() {
@@ -14,8 +14,10 @@ export default async function AdminTreasuryPage() {
     prisma.wallet.findMany({
       include: {
         user: true,
+        asset: true,
         addresses: { where: { isPrimary: true } },
       },
+      orderBy: [{ user: { email: "asc" } }, { asset: { symbol: "asc" } }],
     }),
     prisma.treasuryIssuanceRequest.findMany({
       take: 15,
@@ -35,6 +37,8 @@ export default async function AdminTreasuryPage() {
       address: w.addresses[0].address,
       userEmail: w.user!.email,
       userName: w.user!.displayName,
+      assetSymbol: w.asset.symbol,
+      assetName: w.asset.name,
     }));
 
   return (
@@ -48,7 +52,7 @@ export default async function AdminTreasuryPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Treasury Issuance & Allocations</h1>
             <p className="text-xs text-slate-400 font-mono">
-              Double-entry currency creation via SYSTEM_TREASURY reserve account
+              Multi-asset double-entry currency creation via SYSTEM_TREASURY reserve accounts
             </p>
           </div>
         </div>
@@ -80,7 +84,7 @@ export default async function AdminTreasuryPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono font-bold text-cyan-400">
-                      +{Number(issuance.amount).toLocaleString()} CC
+                      +{Number(issuance.amount).toLocaleString()}
                     </span>
                     <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                       SETTLED

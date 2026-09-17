@@ -10,6 +10,7 @@ This document contains the complete database schema design, entity relationships
 2. **Double-Entry Ledger Invariance:** All account balance updates are derived from immutable `LedgerEntry` rows. Balances are never modified via an un-audited `UPDATE wallet SET balance = ...`.
 3. **Fixed-Point Numerical Precision:** All financial amounts are stored as `Decimal(28, 8)` or `BigInt` (smallest denomination) to avoid floating-point errors.
 4. **Authoritative State Transitions:** Transaction states are strictly validated and tracked via an immutable `TransactionEvent` timeline.
+5. **Multi-Currency Asset Pairs & Swaps:** Every user is provisioned separate wallets for each supported asset (`CC`, `BTC`, `ETH`, `SOL`, `BNB`, `LTC`, `XRP`, `DOGE`). Cross-asset swaps are atomically executed across dual double-entry ledger legs.
 
 ---
 
@@ -60,6 +61,7 @@ enum AccountType {
 enum TransactionType {
   TRANSFER
   TREASURY_MINT
+  SWAP
   WITHDRAWAL
   GAS_FEE
   ADMIN_ADJUSTMENT
@@ -116,6 +118,8 @@ model User {
   withdrawalRequests WithdrawalRequest[]
   issuanceRequests  TreasuryIssuanceRequest[] @relation("RequestedIssuances")
   approvedIssuances TreasuryIssuanceRequest[] @relation("ApprovedIssuances")
+  platformConfigs   PlatformConfig[]
+  assetPairRates    AssetPairRate[]
 
   @@map("users")
 }
@@ -191,8 +195,8 @@ model Session {
 
 model Asset {
   id                String         @id @default(uuid())
-  symbol            String         @unique // e.g. "CC"
-  name              String         // "Coin Caret"
+  symbol            String         @unique // e.g. "CC", "BTC", "ETH"
+  name              String         // "Coin Caret", "Bitcoin", "Ethereum"
   type              AssetType      @default(NATIVE_COIN)
   decimals          Int            @default(8)
   isActive          Boolean        @default(true)
@@ -201,6 +205,8 @@ model Asset {
   wallets           Wallet[]
   ledgerAccounts    LedgerAccount[]
   transactions      Transaction[]
+  fromPairRates     AssetPairRate[] @relation("FromAssetRates")
+  toPairRates       AssetPairRate[] @relation("ToAssetRates")
 
   @@map("assets")
 }
@@ -227,7 +233,7 @@ model WalletAddress {
   id                String         @id @default(uuid())
   walletId          String
   wallet            Wallet         @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  address           String         @unique // e.g., "CC0x7F2a89C1e92DbA440F61E1b380295E8d58c1E4D9"
+  address           String         @unique // e.g., "BTC0x7F2a89C1e92DbA440F61E1b380295E8d58c1E4D9"
   isPrimary         Boolean        @default(true)
   createdAt         DateTime       @default(now())
 
@@ -292,6 +298,9 @@ model Transaction {
   blockHeight       BigInt?
   confirmations     Int                @default(0)
   note              String?
+  linkedTransactionId String?
+  linkedTransaction   Transaction?     @relation("LinkedSwapTransaction", fields: [linkedTransactionId], references: [id])
+  linkedByTransactions Transaction[]   @relation("LinkedSwapTransaction")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -398,7 +407,7 @@ model TreasuryIssuanceRequest {
 
 model NetworkSetting {
   id                String             @id @default(uuid())
-  key               String             @unique // e.g., 'BLOCK_INTERVAL_MS', 'STANDARD_FEE_CC'
+  key               String             @unique // e.g., 'BLOCK_INTERVAL_MS', 'FEE_CC', 'FEE_BTC'
   value             String
   description       String?
   updatedAt         DateTime           @updatedAt
@@ -410,8 +419,8 @@ model AuditLog {
   id                String             @id @default(uuid())
   actorUserId       String?
   actorUser         User?              @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
-  action            String             // e.g. "TREASURY_MINT", "WALLET_FROZEN"
-  entityType        String             // e.g. "Wallet", "Transaction"
+  action            String             // e.g. "TREASURY_MINT", "SET_EXCHANGE_RATE"
+  entityType        String             // e.g. "Wallet", "AssetPairRate"
   entityId          String
   beforeState       Json?
   afterState        Json?
@@ -432,6 +441,8 @@ model PlatformConfig {
   key         String   @unique // e.g. "CC_USD_RATE", "MAINTENANCE_MODE"
   value       String   // Always stored as String; parsed to correct type in service layer
   description String?  // Human-readable description of the config key
+  updatedByUserId String?
+  updatedByUser User?  @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
 
@@ -456,6 +467,28 @@ model ExternalPriceFeedCache {
   @@index([fetchedAt])
   @@map("external_price_feed_cache")
 }
+
+// --------------------------------------------------------
+// ASSET PAIR EXCHANGE RATES (W-801)
+// --------------------------------------------------------
+
+model AssetPairRate {
+  id          String   @id @default(uuid())
+  fromAssetId String
+  fromAsset   Asset    @relation("FromAssetRates", fields: [fromAssetId], references: [id], onDelete: Cascade)
+  toAssetId   String
+  toAsset     Asset    @relation("ToAssetRates", fields: [toAssetId], references: [id], onDelete: Cascade)
+  rate        Decimal  @db.Decimal(28, 8) // Exchange rate: 1 FromAsset = rate ToAsset
+  setByUserId String?
+  setByUser   User?    @relation(fields: [setByUserId], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([fromAssetId, toAssetId])
+  @@index([fromAssetId])
+  @@index([toAssetId])
+  @@map("asset_pair_rates")
+}
 ```
 
 ---
@@ -465,27 +498,16 @@ model ExternalPriceFeedCache {
 | Migration Name | Phase | Description |
 |:---|:---:|:---|
 | `20260916000000_init_coin_caret_schema` | 1 | Initial full schema: Users, Wallets, Ledger, Transactions, Blocks, Audit |
-| `add_platform_config` | 6 (W-603) | Adds `platform_config` key-value table for admin-controlled settings (CC/USD rate, etc.) |
-| `add_external_price_feed_cache` | 6 (W-604) | Adds `external_price_feed_cache` table for server-side CoinGecko API price caching with TTL |
+| `20260916214127_add_platform_config_and_price_cache` | 6 | Adds `platform_config` key-value table and `external_price_feed_cache` table |
+| `20260917152223_add_asset_pair_rate_and_swap_support` | 8 | Adds `asset_pair_rates` table, `SWAP` enum to `TransactionType`, and self-referential `linkedTransactionId` on `Transaction` |
 
 ---
 
 ## 4. Key Design Notes for New Models
 
-### `PlatformConfig`
-- **Storage Pattern:** All values stored as `String`. The `PlatformConfigService` is responsible for parsing and validating the appropriate type (e.g., converting `"0.25"` to `new Decimal("0.25")` for `CC_USD_RATE`).
-- **Write Access:** Only `PLATFORM_OWNER` and `FINANCE_OPERATOR` roles may write via `PATCH /api/admin/config`.
-- **Audit:** Every mutation to `PlatformConfig` must write a corresponding `AuditLog` row with `entityType: "PlatformConfig"`, `entityId: config.id`, `beforeState: { key, value }`, `afterState: { key, value }`.
-- **Known Keys at Launch:**
-
-| Key | Type | Description |
-|:---|:---|:---|
-| `CC_USD_RATE` | `Decimal > 0` | Admin-controlled USD value of 1 CC. Used for display-only USD equivalence. |
-
-### `ExternalPriceFeedCache`
-- **TTL Enforcement:** The `PriceFeedService` checks `fetchedAt` on every request. If `NOW() - fetchedAt > 60s`, the cache is considered stale and a fresh CoinGecko fetch is triggered.
-- **Stale Fallback:** If the CoinGecko API is unreachable, the service returns existing rows unchanged with `isStale: true` in the API response — the UI renders a `Stale Data` warning chip.
-- **Supported Coin IDs at Launch:** `bitcoin`, `ethereum`, `solana`, `binancecoin`, `litecoin`, `ripple`, `dogecoin`.
-- **Attribution Requirement:** The `GET /api/platform/crypto-prices` response and the `CryptoConversionCalculator.tsx` UI must include `Powered by CoinGecko` attribution per CoinGecko free API terms.
-- **No Ledger Impact:** This table is purely a read-through cache. No values from it ever flow into a `LedgerEntry`, balance derivation, or financial transaction.
-
+### `AssetPairRate`
+- **Purpose:** Stores admin-configured exchange rates for direct asset-to-asset swaps (e.g., CC ➔ BTC, ETH ➔ SOL).
+- **Exchange Rate Semantics:** `rate` specifies how many units of `toAsset` are received for 1 unit of `fromAsset` (`toAmount = fromAmount × rate`).
+- **CoinGecko Dynamic Fallback:** If no direct `AssetPairRate` row exists in the database for a requested pair, the system dynamically derives the cross-rate using the CoinGecko price cache: `(fromUsdPrice / toUsdPrice)`.
+- **RBAC:** Managed by `PLATFORM_OWNER` and `FINANCE_OPERATOR` roles via `PATCH /api/admin/exchange-rates`.
+- **Audit Trail:** Every rate mutation generates an immutable `AuditLog` entry tracking actor, old rate, and new rate.

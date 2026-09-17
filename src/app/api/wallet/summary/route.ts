@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getWalletBalance } from "@/modules/ledger/service/ledger.service";
+import { AssetWalletSummary } from "@/types/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -15,48 +16,77 @@ export async function GET() {
 
     const userId = (session.user as any).id;
 
-    // Find primary wallet
-    const wallet = await prisma.wallet.findFirst({
+    // Find all user wallets with addresses and asset metadata
+    const userWallets = await prisma.wallet.findMany({
       where: { userId },
       include: {
         addresses: true,
         asset: true,
       },
+      orderBy: { createdAt: "asc" },
     });
 
-    if (!wallet) {
+    if (!userWallets || userWallets.length === 0) {
       return NextResponse.json({ error: "No wallet found for user" }, { status: 404 });
     }
 
-    // Derive balances
-    const balances = await getWalletBalance(wallet.id);
+    // Process all wallets
+    const walletSummaries: AssetWalletSummary[] = [];
+    const allAddresses: string[] = [];
 
-    // Fetch recent transactions involving this wallet's addresses
-    const primaryAddress = wallet.addresses[0]?.address ?? "";
+    for (const w of userWallets) {
+      const balances = await getWalletBalance(w.id);
+      const addr = w.addresses[0]?.address ?? "";
+      if (addr) allAddresses.push(addr);
+
+      walletSummaries.push({
+        walletId: w.id,
+        assetSymbol: w.asset.symbol,
+        assetName: w.asset.name,
+        decimals: w.asset.decimals,
+        address: addr,
+        availableBalance: balances.available.toFixed(8),
+        reservedBalance: balances.reserved.toFixed(8),
+        totalBalance: balances.total.toFixed(8),
+      });
+    }
+
+    // Default primary wallet is CC, or the first wallet
+    const primaryWallet =
+      userWallets.find((w) => w.asset.symbol === "CC") || userWallets[0];
+    const primarySummary =
+      walletSummaries.find((s) => s.assetSymbol === "CC") || walletSummaries[0];
+
+    // Fetch recent transactions involving any of this user's wallet addresses or initiated by user
     const transactions = await prisma.transaction.findMany({
       where: {
         OR: [
-          { fromAddress: primaryAddress },
-          { toAddress: primaryAddress },
+          { fromAddress: { in: allAddresses } },
+          { toAddress: { in: allAddresses } },
           { initiatorUserId: userId },
         ],
+      },
+      include: {
+        asset: true,
       },
       orderBy: { createdAt: "desc" },
       take: 20,
     });
 
     return NextResponse.json({
-      walletId: wallet.id,
-      address: primaryAddress,
-      assetSymbol: wallet.asset.symbol,
-      assetName: wallet.asset.name,
-      availableBalance: balances.available.toFixed(8),
-      reservedBalance: balances.reserved.toFixed(8),
-      totalBalance: balances.total.toFixed(8),
+      walletId: primaryWallet.id,
+      address: primarySummary.address,
+      assetSymbol: primarySummary.assetSymbol,
+      assetName: primarySummary.assetName,
+      availableBalance: primarySummary.availableBalance,
+      reservedBalance: primarySummary.reservedBalance,
+      totalBalance: primarySummary.totalBalance,
+      wallets: walletSummaries,
       transactions: transactions.map((tx) => ({
         id: tx.id,
         txHash: tx.txHash,
         type: tx.type,
+        assetSymbol: tx.asset?.symbol || "CC",
         fromAddress: tx.fromAddress,
         toAddress: tx.toAddress,
         amount: tx.amount.toFixed(8),

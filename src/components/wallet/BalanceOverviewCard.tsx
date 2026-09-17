@@ -1,5 +1,5 @@
 import React from "react";
-import { Wallet, ArrowUpRight, ArrowDownLeft, Clock, ShieldCheck } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownLeft, Clock, ShieldCheck, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 
 interface BalanceOverviewCardProps {
@@ -57,29 +57,33 @@ export function BalanceOverviewCard({
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/wallet/swap"
+              className="px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 border border-cyan-500/30 text-cyan-300 font-bold text-sm transition-all flex items-center gap-2 hover:scale-[1.02]"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              <span>Swap Assets</span>
+            </Link>
             <Link
               href="/wallet/send"
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 hover:scale-[1.02]"
+              className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 hover:scale-[1.02]"
             >
               <ArrowUpRight className="w-4 h-4" />
-              <span>Send CC</span>
+              <span>Send</span>
             </Link>
             <Link
               href="/wallet/receive"
-              className="px-6 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2 hover:border-slate-700"
+              className="px-5 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2 hover:border-slate-700"
             >
               <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
-              <span>Receive CC</span>
+              <span>Receive</span>
             </Link>
             <Link
               href="/wallet/withdraw"
-              className="px-5 py-3 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-slate-400 hover:text-slate-200 font-medium text-sm transition-all"
+              className="px-4 py-3 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-slate-400 hover:text-slate-200 font-medium text-sm transition-all"
             >
               <span>Withdraw</span>
             </Link>
-          </div>
         </div>
       </div>
 

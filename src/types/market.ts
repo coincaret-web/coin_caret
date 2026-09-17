@@ -31,3 +31,17 @@ export interface CryptoConversionResult {
   equivalentAmount: string;
   iconUrl?: string;
 }
+
+export interface AssetPairRateDto {
+  id?: string;
+  fromSymbol: string;
+  toSymbol: string;
+  rate: string;
+  isCustomAdminRate: boolean;
+  updatedAt?: string;
+}
+
+export interface ExchangeRateMatrixResponse {
+  success: boolean;
+  rates: AssetPairRateDto[];
+}

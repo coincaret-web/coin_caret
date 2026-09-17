@@ -1,10 +1,11 @@
 import crypto from "crypto";
 
 /**
- * Generates an authentic cryptographic wallet address with checksum.
- * Format: CC0x + 40 hexadecimal characters.
+ * Generates an authentic cryptographic wallet address with checksum and symbol prefix.
+ * Format: [PREFIX]0x + 40 hexadecimal characters.
  */
-export function generateAddress(): string {
+export function generatePrefixedAddress(prefix: string): string {
+  const cleanPrefix = (prefix || "CC").toUpperCase();
   const randomBytes = crypto.randomBytes(20);
   const hex = randomBytes.toString("hex");
   const hash = crypto.createHash("sha256").update(hex).digest("hex");
@@ -19,19 +20,32 @@ export function generateAddress(): string {
     }
   }
 
-  return `CC0x${checksummed}`;
+  return `${cleanPrefix}0x${checksummed}`;
 }
 
 /**
- * Validates whether an address matches the Coin Caret format and checksum.
+ * Generates a default CC wallet address.
  */
-export function validateAddressChecksum(address: string): boolean {
+export function generateAddress(): string {
+  return generatePrefixedAddress("CC");
+}
+
+/**
+ * Validates whether an address matches the cryptographic format and checksum.
+ * Supports standard CC0x or any asset prefix (e.g. BTC0x, ETH0x, SOL0x).
+ */
+export function validateAddressChecksum(address: string, expectedPrefix?: string): boolean {
   if (!address || typeof address !== "string") return false;
-  if (!address.startsWith("CC0x")) return false;
 
-  const hexPart = address.slice(4);
-  if (hexPart.length !== 40) return false;
-  if (!/^[0-9a-fA-F]{40}$/.test(hexPart)) return false;
+  const match = address.match(/^([A-Z0-9]{2,6})0x([0-9a-fA-F]{40})$/);
+  if (!match) return false;
 
-  return true;
+  const prefix = match[1];
+  const hexPart = match[2];
+
+  if (expectedPrefix && prefix !== expectedPrefix.toUpperCase()) {
+    return false;
+  }
+
+  return hexPart.length === 40;
 }

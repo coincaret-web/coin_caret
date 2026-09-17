@@ -13,12 +13,14 @@ import {
   Building2
 } from "lucide-react";
 
-interface WalletOption {
+export interface WalletOption {
   id: string;
   label: string;
   address: string;
   userEmail: string;
   userName: string;
+  assetSymbol: string;
+  assetName: string;
 }
 
 interface Props {
@@ -36,7 +38,10 @@ export function TreasuryMintForm({ wallets }: Props) {
     txHash?: string;
   } | null>(null);
 
-  const presets = ["500.00000000", "1000.00000000", "5000.00000000", "25000.00000000"];
+  const selectedWallet = wallets.find((w) => w.id === selectedWalletId);
+  const activeSymbol = selectedWallet?.assetSymbol || "CC";
+
+  const presets = ["100.00000000", "500.00000000", "1000.00000000", "5000.00000000"];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,17 +56,18 @@ export function TreasuryMintForm({ wallets }: Props) {
           recipientWalletId: selectedWalletId,
           amount,
           reason,
+          assetSymbol: activeSymbol,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to mint treasury CC.");
+        throw new Error(data.error || "Failed to mint treasury asset.");
       }
 
       setStatusMessage({
         type: "success",
-        text: `Successfully minted ${Number(amount).toLocaleString()} CC to client wallet.`,
+        text: `Successfully minted ${Number(amount).toLocaleString()} ${activeSymbol} to client wallet.`,
         txHash: data.txHash,
       });
     } catch (err: any) {
@@ -73,8 +79,6 @@ export function TreasuryMintForm({ wallets }: Props) {
       setIsSubmitting(false);
     }
   };
-
-  const selectedWallet = wallets.find((w) => w.id === selectedWalletId);
 
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 space-y-6">
@@ -119,7 +123,7 @@ export function TreasuryMintForm({ wallets }: Props) {
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
             <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Target Recipient Account</span>
+            <span>Target Recipient Account & Asset</span>
           </label>
           <select
             value={selectedWalletId}
@@ -128,13 +132,13 @@ export function TreasuryMintForm({ wallets }: Props) {
           >
             {wallets.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.userName} ({w.userEmail}) — {w.address.slice(0, 10)}...{w.address.slice(-6)}
+                [{w.assetSymbol}] {w.userName} ({w.userEmail}) — {w.address.slice(0, 10)}...{w.address.slice(-6)}
               </option>
             ))}
           </select>
           {selectedWallet && (
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-xs font-mono text-slate-400 flex justify-between items-center">
-              <span>Verified Address:</span>
+              <span>Verified Address ({selectedWallet.assetSymbol}):</span>
               <span className="text-cyan-400 font-bold">{selectedWallet.address}</span>
             </div>
           )}
@@ -144,7 +148,7 @@ export function TreasuryMintForm({ wallets }: Props) {
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
             <Building2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Issuance Amount (CC)</span>
+            <span>Issuance Amount ({activeSymbol})</span>
           </label>
           <div className="relative">
             <input
@@ -154,7 +158,7 @@ export function TreasuryMintForm({ wallets }: Props) {
               placeholder="1000.00000000"
               className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-amber-500/50"
             />
-            <span className="absolute right-3.5 top-2.5 text-xs font-mono text-slate-400">CC</span>
+            <span className="absolute right-3.5 top-2.5 text-xs font-mono text-slate-400">{activeSymbol}</span>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
@@ -165,7 +169,7 @@ export function TreasuryMintForm({ wallets }: Props) {
                 onClick={() => setAmount(preset)}
                 className="px-3 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-xs font-mono text-slate-300 transition-colors"
               >
-                +{Number(preset).toLocaleString()} CC
+                +{Number(preset).toLocaleString()} {activeSymbol}
               </button>
             ))}
           </div>
@@ -181,7 +185,7 @@ export function TreasuryMintForm({ wallets }: Props) {
             type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g., Client Demo Onboarding Allocation"
+            placeholder="e.g., Institutional Liquidity Allocation"
             required
             className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500/50"
           />
