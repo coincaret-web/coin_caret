@@ -1,7 +1,6 @@
-import { PrismaClient, AssetType } from "@prisma/client";
+import { AssetType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { SupportedAssetDefinition, AssetDto } from "@/types/asset";
-
-const prisma = new PrismaClient();
 
 export const SUPPORTED_ASSETS: SupportedAssetDefinition[] = [
   {

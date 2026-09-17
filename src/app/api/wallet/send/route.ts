@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { internalNetworkEngine } from "@/modules/network/internal-engine/internal.engine";
+import { resolveWalletForSend } from "@/modules/wallets/service/wallet-resolver.service";
 
 const sendSchema = z.object({
+  /** Optional: explicit wallet UUID. Takes precedence over assetSymbol. */
   fromWalletId: z.string().uuid("Invalid source wallet ID").optional(),
+  /** Optional: asset symbol (e.g., "BTC", "ETH"). Used to resolve the correct wallet. */
+  assetSymbol: z.string().min(1).max(10).optional(),
   toAddress: z.string().min(10, "Invalid destination address"),
   amount: z.coerce.number().positive("Transfer amount must be strictly greater than zero"),
   note: z.string().max(255).optional(),
@@ -15,48 +18,42 @@ const sendSchema = z.object({
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
+
+    if (!session?.user || !(session.user as any).id) {
+      return NextResponse.json(
+        { error: "Unauthorized. Please sign in to initiate transfers." },
+        { status: 401 }
+      );
+    }
+
+    const userId = (session.user as any).id;
     const body = await req.json();
     const validated = sendSchema.parse(body);
 
-    let resolvedWalletId = validated.fromWalletId;
+    // Resolve the correct wallet using the multi-asset resolver
+    const resolvedWallet = await resolveWalletForSend({
+      userId,
+      fromWalletId: validated.fromWalletId,
+      assetSymbol: validated.assetSymbol,
+    });
 
-    if (session?.user && (session.user as any).id) {
-      const userId = (session.user as any).id;
-      if (!resolvedWalletId) {
-        const wallet = await prisma.wallet.findFirst({
-          where: { userId },
-        });
-        if (!wallet) {
-          return NextResponse.json({ error: "User wallet not found." }, { status: 404 });
-        }
-        resolvedWalletId = wallet.id;
-      } else {
-        // Verify that the requested wallet belongs to the user
-        const wallet = await prisma.wallet.findFirst({
-          where: { id: resolvedWalletId, userId },
-        });
-        if (!wallet) {
-          return NextResponse.json({ error: "Unauthorized access to specified wallet." }, { status: 403 });
-        }
-      }
-    } else if (!resolvedWalletId) {
-      return NextResponse.json({ error: "Unauthorized. Please sign in to initiate transfers." }, { status: 401 });
-    }
-
-    const idempotencyKey = req.headers.get("Idempotency-Key") || `tx-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const idempotencyKey =
+      req.headers.get("Idempotency-Key") ||
+      `tx-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const result = await internalNetworkEngine.broadcastTx({
-      fromWalletId: resolvedWalletId,
+      fromWalletId: resolvedWallet.id,
       toAddress: validated.toAddress,
       amount: validated.amount,
       note: validated.note,
       idempotencyKey,
-      initiatorUserId: (session?.user as any)?.id,
+      initiatorUserId: userId,
     });
 
     return NextResponse.json(
       {
         message: "Transaction broadcasted to mempool",
+        assetSymbol: resolvedWallet.asset.symbol,
         ...result,
       },
       { status: 201 }
@@ -69,10 +66,14 @@ export async function POST(req: Request) {
       );
     }
 
+    // Surface auth/ownership errors as 403
+    if (error.message?.toLowerCase().includes("unauthorized")) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
     return NextResponse.json(
       { error: error.message || "An unexpected error occurred during transfer submission." },
       { status: 400 }
     );
   }
 }
-

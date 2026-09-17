@@ -5,17 +5,32 @@ import { QRCodeSVG } from "qrcode.react";
 import { Copy, Check, ShieldCheck, Info, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+export interface ReceiveWalletOption {
+  symbol: string;
+  name: string;
+  address?: string;
+}
+
 interface ReceiveCardProps {
   address: string;
+  assetSymbol?: string;
+  assetName?: string;
   networkName?: string;
   chainId?: number;
+  wallets?: ReceiveWalletOption[];
+  onSelectAsset?: (symbol: string) => void;
 }
 
 export function ReceiveCard({
   address,
+  assetSymbol = "CC",
+  assetName = "Coin Caret",
   networkName = "Coin Caret Mainnet",
   chainId = 3847,
+  wallets,
+  onSelectAsset,
 }: ReceiveCardProps) {
+  const displaySymbol = assetSymbol.toUpperCase();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -35,7 +50,7 @@ export function ReceiveCard({
           <span>Back to Dashboard</span>
         </Link>
         <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-          Native CC Asset
+          {displaySymbol === "CC" ? "Native CC Asset" : `${displaySymbol} Vault`}
         </span>
       </div>
 
@@ -43,16 +58,37 @@ export function ReceiveCard({
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <h2 className="text-2xl font-extrabold text-white tracking-tight mb-2">
-          Receive Coin Caret (CC)
+          Receive {assetName} ({displaySymbol})
         </h2>
-        <p className="text-xs text-slate-400 max-w-sm mx-auto mb-8">
+        <p className="text-xs text-slate-400 max-w-sm mx-auto mb-6">
           Scan QR code or copy your verifiable cryptographic address below to receive instant transfers.
         </p>
+
+        {/* Asset Selector */}
+        {wallets && wallets.length > 0 && (
+          <div className="mb-8 max-w-sm mx-auto text-left">
+            <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Select Asset to Receive
+            </label>
+            <select
+              value={displaySymbol}
+              onChange={(e) => onSelectAsset?.(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors cursor-pointer"
+            >
+              {wallets.map((w) => (
+                <option key={w.symbol} value={w.symbol} className="bg-slate-900 text-white">
+                  {w.symbol} — {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* High-contrast QR Code Frame */}
         <div className="inline-block p-4 rounded-2xl bg-white shadow-2xl mb-8">
           <QRCodeSVG
             value={address}
+
             size={200}
             level="H"
             includeMargin={true}
@@ -62,7 +98,7 @@ export function ReceiveCard({
         {/* Address Container */}
         <div className="mb-8">
           <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Your CC0x Deposit Address
+            Your {displaySymbol}0x Deposit Address
           </label>
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3 text-left">
             <span className="font-mono text-xs sm:text-sm text-emerald-400 font-bold break-all">

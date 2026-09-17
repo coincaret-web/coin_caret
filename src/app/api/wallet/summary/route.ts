@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getWalletBalance } from "@/modules/ledger/service/ledger.service";
+import { ensureAllWalletsForUser } from "@/modules/wallets/service/wallet.service";
 import { AssetWalletSummary } from "@/types/wallet";
 
 export const dynamic = "force-dynamic";
@@ -16,19 +17,13 @@ export async function GET() {
 
     const userId = (session.user as any).id;
 
-    // Find all user wallets with addresses and asset metadata
-    const userWallets = await prisma.wallet.findMany({
-      where: { userId },
-      include: {
-        addresses: true,
-        asset: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    // Ensure all 8 asset wallets exist for this user
+    const userWallets = await ensureAllWalletsForUser(userId);
 
     if (!userWallets || userWallets.length === 0) {
       return NextResponse.json({ error: "No wallet found for user" }, { status: 404 });
     }
+
 
     // Process all wallets
     const walletSummaries: AssetWalletSummary[] = [];

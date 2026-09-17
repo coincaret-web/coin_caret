@@ -11,6 +11,8 @@ interface SendReviewModalProps {
   amount: string;
   networkFee: string;
   totalDebit: string;
+  /** Asset symbol displayed in amount/fee labels. Defaults to "CC". */
+  assetSymbol?: string;
   isLoading: boolean;
 }
 
@@ -22,8 +24,10 @@ export function SendReviewModal({
   amount,
   networkFee,
   totalDebit,
+  assetSymbol = "CC",
   isLoading,
 }: SendReviewModalProps) {
+  const sym = assetSymbol.toUpperCase();
   if (!isOpen) return null;
 
   return (
@@ -61,15 +65,15 @@ export function SendReviewModal({
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400">Transfer Amount</span>
-              <span className="font-mono font-bold text-white text-sm">{amount} CC</span>
+              <span className="font-mono font-bold text-white text-sm">{amount} {sym}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400">Network Gas Fee</span>
-              <span className="font-mono text-slate-300">{networkFee} CC</span>
+              <span className="font-mono text-slate-300">{networkFee} {sym}</span>
             </div>
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm">
               <span className="font-semibold text-white">Total Ledger Debit</span>
-              <span className="font-mono font-black text-emerald-400 text-base">{totalDebit} CC</span>
+              <span className="font-mono font-black text-emerald-400 text-base">{totalDebit} {sym}</span>
             </div>
           </div>
 

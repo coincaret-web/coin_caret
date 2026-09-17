@@ -1152,3 +1152,40 @@ This document is the authoritative single source of truth for the implementation
   - [ ] `explorer.coincaret.com` → Block explorer with asset filter → BTC transaction visible.
   - [ ] `admin.coincaret.com` → Admin dashboard → Treasury mint any asset → Exchange rates configurable.
   - [ ] Railway Web service + Worker service live → Client accesses live site → Full multi-currency demo functions with zero lag and 100% authenticity → ✅ Done.
+
+---
+
+## 3. Session Notes
+
+### Session: Multi-Asset Send, Receive, Swap & Auto-Provisioning (2026-09-17 / 2026-09-18)
+
+#### Objectives & User Requests Addressed
+1. **Swap Dropdown Restriction:** Resolved issue where Swap form asset dropdown was only showing CC.
+2. **Multi-Asset Send & Receive Views:** Resolved issue where navigating to `/wallet/send` or `/wallet/receive` defaulted to CC only without an in-page asset selector.
+3. **Legacy User Wallet Provisioning:** Resolved issue where users created before multi-wallet architecture only had 1 wallet (CC) in the database.
+
+#### Key Architectural & Implementation Changes
+1. **Multi-Asset Send & Receive Asset Selectors (`SendForm`, `ReceiveCard`, `send/page.tsx`, `receive/page.tsx`):**
+   - Implemented interactive asset dropdowns in `SendForm` and `ReceiveCard` allowing instantaneous switching across all 8 supported cryptocurrencies (`CC`, `BTC`, `ETH`, `SOL`, `BNB`, `LTC`, `XRP`, `DOGE`).
+   - Switching assets immediately updates available balance, dynamic per-asset network fee schedule (`FEE_MAP`), cryptographic address formatting (`BTC0x...`, `ETH0x...`, etc.), QR codes, and send execution parameters.
+   - Synchronized client router state (`/wallet/send?asset=BTC`, `/wallet/receive?asset=BTC`) with parallel platform asset registry & user wallet summary fetching.
+
+2. **Automatic Multi-Wallet Lazy Provisioning (`ensureAllWalletsForUser`):**
+   - Added `ensureAllWalletsForUser(userId)` to `src/modules/wallets/service/wallet.service.ts`.
+   - Wired into `GET /api/wallet/summary` to ensure any user (legacy, seeded, or newly registered) automatically gets all 8 asset wallets, cryptographic deposit addresses, and ledger accounts (`AVAILABLE`, `RESERVED_PENDING`) provisioned on their first request.
+
+3. **Multi-Asset Send Backend Resolver (`resolveWalletForSend`):**
+   - Created `src/modules/wallets/service/wallet-resolver.service.ts` to resolve the exact source wallet by `assetSymbol` or `fromWalletId` with user ownership validation.
+   - Updated `POST /api/wallet/send` to support dynamic multi-asset transfers.
+
+4. **Asset Registry Prisma Singleton Refactor:**
+   - Fixed `src/modules/market/service/asset-registry.service.ts` to use shared `@/lib/prisma` client rather than spawning ad-hoc `new PrismaClient()` instances.
+
+5. **Multi-Asset Seed Overhaul (`prisma/seed.ts`):**
+   - Updated seed script to provision and fund all 8 asset wallets for `user@coincaret.com` with realistic demo balances (`CC=5000`, `BTC=0.15`, `ETH=2.5`, `SOL=35`, `BNB=8`, `LTC=12.5`, `XRP=1500`, `DOGE=8000`).
+
+#### TDD Verification & Quality Gates
+- **Unit Tests:** 81/81 passed across 28 test suites (including `MultiAssetSend.test.tsx`, `MultiAssetReceive.test.tsx`, `asset-registry-singleton.test.ts`).
+- **Integration Tests:** 71/71 passed across 23 test suites against live PostgreSQL (`multi-wallet-provisioning.integration.test.ts`, `multi-asset-send.integration.test.ts`, `swap-engine.integration.test.ts`).
+- **TypeScript:** 0 errors across entire codebase (`tsc --noEmit`).
+

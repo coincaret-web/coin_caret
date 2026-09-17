@@ -43,6 +43,61 @@ export async function provisionAllWalletsForUser(userId: string) {
   });
 }
 
+/**
+ * Ensures that all 8 supported asset wallets exist for a user.
+ * If any asset wallets are missing, they are provisioned immediately.
+ */
+export async function ensureAllWalletsForUser(userId: string) {
+  const existingWallets = await prisma.wallet.findMany({
+    where: { userId },
+    include: {
+      asset: true,
+      addresses: true,
+      ledgerAccounts: true,
+    },
+  });
+
+  const existingSymbols = new Set(existingWallets.map((w) => w.asset?.symbol));
+  const missingAssets = SUPPORTED_ASSETS.filter((a) => !existingSymbols.has(a.symbol));
+
+  if (missingAssets.length > 0) {
+    for (const assetDef of missingAssets) {
+      let asset = await prisma.asset.findUnique({
+        where: { symbol: assetDef.symbol },
+      });
+
+      if (!asset) {
+        asset = await prisma.asset.create({
+          data: {
+            symbol: assetDef.symbol,
+            name: assetDef.name,
+            decimals: assetDef.decimals,
+            type: assetDef.type,
+            isActive: true,
+          },
+        });
+      }
+
+      const address = generatePrefixedAddress(asset.symbol);
+      const label = `${asset.name} Vault`;
+      await provisionWallet(userId, address, asset.id, label);
+    }
+
+    return prisma.wallet.findMany({
+      where: { userId },
+      include: {
+        asset: true,
+        addresses: true,
+        ledgerAccounts: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  return existingWallets;
+}
+
+
 export async function getWalletByAddress(address: string) {
   return findWalletByAddress(address);
 }
