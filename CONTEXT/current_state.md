@@ -1078,15 +1078,901 @@ This document is the authoritative single source of truth for the implementation
   - Unified multi-asset portfolio dashboard with allocation stack bar and coin theme cards.
   - Updated marketing landing page with asset marquee ticker and multi-currency institutional narrative.
 
+
+#### Session: Multi-Asset Send, Receive, Swap & Auto-Provisioning (2026-09-17 / 2026-09-18)
+
+##### Objectives & User Requests Addressed
+1. **Swap Dropdown Restriction:** Resolved issue where Swap form asset dropdown was only showing CC.
+2. **Multi-Asset Send & Receive Views:** Resolved issue where navigating to `/wallet/send` or `/wallet/receive` defaulted to CC only without an in-page asset selector.
+3. **Legacy User Wallet Provisioning:** Resolved issue where users created before multi-wallet architecture only had 1 wallet (CC) in the database.
+
+##### Key Architectural & Implementation Changes
+1. **Multi-Asset Send & Receive Asset Selectors (`SendForm`, `ReceiveCard`, `send/page.tsx`, `receive/page.tsx`):**
+   - Implemented interactive asset dropdowns in `SendForm` and `ReceiveCard` allowing instantaneous switching across all 8 supported cryptocurrencies (`CC`, `BTC`, `ETH`, `SOL`, `BNB`, `LTC`, `XRP`, `DOGE`).
+   - Switching assets immediately updates available balance, dynamic per-asset network fee schedule (`FEE_MAP`), cryptographic address formatting (`BTC0x...`, `ETH0x...`, etc.), QR codes, and send execution parameters.
+   - Synchronized client router state (`/wallet/send?asset=BTC`, `/wallet/receive?asset=BTC`) with parallel platform asset registry & user wallet summary fetching.
+
+2. **Automatic Multi-Wallet Lazy Provisioning (`ensureAllWalletsForUser`):**
+   - Added `ensureAllWalletsForUser(userId)` to `src/modules/wallets/service/wallet.service.ts`.
+   - Wired into `GET /api/wallet/summary` to ensure any user (legacy, seeded, or newly registered) automatically gets all 8 asset wallets, cryptographic deposit addresses, and ledger accounts (`AVAILABLE`, `RESERVED_PENDING`) provisioned on their first request.
+
+3. **Multi-Asset Send Backend Resolver (`resolveWalletForSend`):**
+   - Created `src/modules/wallets/service/wallet-resolver.service.ts` to resolve the exact source wallet by `assetSymbol` or `fromWalletId` with user ownership validation.
+   - Updated `POST /api/wallet/send` to support dynamic multi-asset transfers.
+
+4. **Asset Registry Prisma Singleton Refactor:**
+   - Fixed `src/modules/market/service/asset-registry.service.ts` to use shared `@/lib/prisma` client rather than spawning ad-hoc `new PrismaClient()` instances.
+
+5. **Multi-Asset Seed Overhaul (`prisma/seed.ts`):**
+   - Updated seed script to provision and fund all 8 asset wallets for `user@coincaret.com` with realistic demo balances (`CC=5000`, `BTC=0.15`, `ETH=2.5`, `SOL=35`, `BNB=8`, `LTC=12.5`, `XRP=1500`, `DOGE=8000`).
+
+##### TDD Verification & Quality Gates
+- **Unit Tests:** 81/81 passed across 28 test suites (including `MultiAssetSend.test.tsx`, `MultiAssetReceive.test.tsx`, `asset-registry-singleton.test.ts`).
+- **Integration Tests:** 71/71 passed across 23 test suites against live PostgreSQL (`multi-wallet-provisioning.integration.test.ts`, `multi-asset-send.integration.test.ts`, `swap-engine.integration.test.ts`).
+- **TypeScript:** 0 errors across entire codebase (`tsc --noEmit`).
+
+---
+### Phase 9 Implementation Plan: KYC Identity Verification, Extended User Profiles & Admin User Management
+
+> **Document Status:** APPROVED FOR IMPLEMENTATION — 2026-09-18
+> **Authored by:** Engineering Team
+> **Strict Protocol:** All work items follow the `CONTEXT/TDD_INSTRUCTION_GUIDE.md` 5-Principle TDD Protocol (RED → GREEN → Verification Chain). No item is marked `[x]` unless all three gates have passed against live PostgreSQL.
+
 ---
 
-### Phase 9 — Full-Stack E2E Verification & Railway Deployment
+#### Executive Summary
+
+Phase 9 is a **cross-cutting user identity & compliance overhaul** that touches the registration flow, database schema, admin command center, and treasury issuance UX. It does NOT alter the double-entry ledger engine, block generation, swap engine, or explorer — those remain intact.
+
+##### ⚠️ Pre-Implementation Mandatory Steps
+
+> **CRITICAL — READ BEFORE TOUCHING ANY CODE**
+
+##### Step A: Understand What Is Changing in the Database
+
+This phase introduces **one new migration** (`20260918000000_add_kyc_and_extended_profile`) that:
+- Adds `phoneNumber` and `address` columns to the `profiles` table.
+- Adds `kycRequired Boolean @default(true)` to the `users` table.
+- Adds a new `UserVerification` model with KYC status state machine.
+- Adds a new `KycDocument` model for encrypted document storage.
+- Adds two new `KycDocumentType` and `KycVerificationStatus` enums.
+
+##### Step B: Full Database Wipe & Re-seed Required
+
+Because new non-nullable fields are being added to existing tables (specifically `phoneNumber` and `address` on `profiles`), and the seed user profiles need updating to include these fields, **both databases must be wiped and re-migrated** before running the new seed.
+
+**Execute in this exact order for both `coin_caret_dev` and `coin_caret_test`:**
+
+```bash
+# 1. Drop and recreate dev database
+npx prisma migrate reset --force --skip-seed
+
+# 2. Apply all migrations fresh (including new Phase 9 migration)
+npx prisma migrate deploy
+
+# 3. Regenerate Prisma client
+npx prisma generate
+
+# 4. Run updated seed
+npx prisma db seed
+```
+
+> The test database (`coin_caret_test`) must also be wiped before running the integration test suite. The `.env.test` file already points to the correct test DB — running `npx dotenv -e .env.test -- prisma migrate reset --force --skip-seed` handles it.
+
+##### Step C: Files That Need Updating Outside of New Feature Files
+
+The following **existing files** must be updated as part of this phase. They are NOT new files:
+
+| File | Why It Needs Updating |
+|:---|:---|
+| `prisma/schema.prisma` | New models, enums, and fields on `User` and `Profile` |
+| `prisma/seed.ts` | Updated to include `phoneNumber`, `address`, KYC config keys, and demo user KYC state |
+| `.env.example` | New `KYC_ENCRYPTION_KEY` variable must be documented |
+| `.env.test.example` | Same `KYC_ENCRYPTION_KEY` needed for test environment |
+| `.env` (local) | Developer must manually add `KYC_ENCRYPTION_KEY` |
+| `.env.test` (local) | Developer must manually add `KYC_ENCRYPTION_KEY` for test suite |
+| `src/app/api/auth/register/route.ts` | Accept `phoneNumber` and `address` in Zod schema |
+| `src/modules/identity/service/auth.service.ts` | Pass `phoneNumber` and `address` to `Profile.create` |
+| `src/modules/identity/repository/user.repository.ts` | Update `createUser()` to write profile fields |
+| `src/app/(auth)/register/page.tsx` | Add Phone and Address input fields |
+| `src/app/(admin)/admin/treasury/page.tsx` | Treasury page becomes a redirect or simplified entry point (minting moves to user profile) |
+| `src/components/admin/AdminNavbar.tsx` | Add `Users` nav link |
+| `src/app/(wallet)/layout.tsx` | Add KYC gate middleware check redirecting to `/verify` if needed |
+| `src/types/user.ts` (may not exist yet) | Create/update with KYC DTOs |
+| `CONTEXT/current_state.md` | Add Phase 9 work items and session notes on completion |
+| `CONTEXT/database_schema.md` | Add new models to schema reference |
+| `CONTEXT/decision_log.md` | Add ADR-013 for KYC architecture decisions |
+| `CONTEXT/project_data.md` | Update RBAC matrix with new `admin:users:manage` permission details |
+
+##### Step D: New Environment Variable Required
+
+A `KYC_ENCRYPTION_KEY` must be added to `.env` and `.env.test` before running the seed or any KYC-related tests. This is a 32-byte AES-256 key in hex format.
+
+```bash
+# Generate a key:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Then add to `.env`:
+```
+KYC_ENCRYPTION_KEY="<your-64-char-hex-string-here>"
+```
+
+This key must **never** be committed to source control. It is listed in `.env.example` as a placeholder only.
+
+---
+
+#### Work Item Breakdown
+
+---
+
+##### W-901 — Extended Registration: Phone Number & Address Collection
+
+**Root cause:** The current registration form only collects `displayName`, `email`, and `password`. For a financial platform serving institutional and individual clients, basic contact information (phone number and physical address) is required for account profile completeness and downstream KYC matching. The `Profile` model already exists but only holds UI preferences — it must be extended.
+
+**Goal:** After completing W-901, a newly registered user will have `phoneNumber` and `address` stored in their `profiles` row. The `/api/auth/register` endpoint accepts and validates these fields. The `/register` UI page renders Phone and Address input fields.
+
+**Approach:** Add `phoneNumber String` and `address String` to `Profile` in `schema.prisma`. Update the Zod schema on the register route. Update `auth.service.ts` and `user.repository.ts` to write these fields. Update the register page UI.
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/extended-registration.integration.test.ts`):**
+  - [ ] Test 1: `POST /api/auth/register` with `{ displayName, email, password, phoneNumber: "+1-555-867-5309", address: "123 Blockchain Ave, NYC 10001" }` → Returns HTTP 201 → `prisma.profile.findUnique({ where: { userId } })` returns row with `phoneNumber` and `address` correctly stored.
+  - [ ] Test 2: `POST /api/auth/register` without `phoneNumber` → Returns **HTTP 400 Bad Request** (Zod validation: phoneNumber required).
+  - [ ] Test 3: `POST /api/auth/register` without `address` → Returns **HTTP 400 Bad Request** (Zod validation: address required).
+  - [ ] Test 4: `POST /api/auth/register` with `phoneNumber` containing fewer than 7 digits → Returns **HTTP 400 Bad Request**.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Schema] Add to `Profile` model in `prisma/schema.prisma`:
+    ```prisma
+    phoneNumber   String
+    address       String
+    ```
+    Migration name: `20260918000000_add_kyc_and_extended_profile` (this single migration covers ALL schema changes in Phase 9 — W-901 through W-904).
+  - [ ] [Repository] Update `src/modules/identity/repository/user.repository.ts` — `createUser()` function now accepts `phoneNumber: string` and `address: string` and passes them to `profile: { create: { ..., phoneNumber, address } }`.
+  - [ ] [Service] Update `src/modules/identity/service/auth.service.ts` — `register()` method destructures and passes `phoneNumber` and `address` to repository.
+  - [ ] [Controller] Update `src/app/api/auth/register/route.ts` — Zod schema adds:
+    ```typescript
+    phoneNumber: z.string().min(7, "Phone number must be at least 7 characters").max(20),
+    address: z.string().min(10, "Address must be at least 10 characters").max(500),
+    ```
+  - [ ] [Types] Create/update `src/types/user.ts` — Add `RegisterRequest` DTO with `phoneNumber` and `address` fields. Add `UserProfileDto` with all profile fields.
+  - [ ] Run integration test — **confirm GREEN.**
+
+- [ ] **RED — Unit (`src/tests/unit/extended-registration.test.ts`):**
+  - [ ] Test: Zod schema rejects `phoneNumber` with fewer than 7 chars.
+  - [ ] Test: Zod schema rejects `address` with fewer than 10 chars.
+  - [ ] Test: Zod schema accepts `phoneNumber: "+92-333-1234567"` (international format).
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Component] Update `src/app/(auth)/register/page.tsx`:
+    - Add `phoneNumber` state and input field (type="tel", icon: `Phone` from lucide-react, placeholder: "+1 (555) 867-5309").
+    - Add `address` state and `<textarea>` field (icon: `MapPin` from lucide-react, placeholder: "123 Main Street, City, State, ZIP").
+    - Both fields marked `required`.
+    - Submit handler passes `phoneNumber` and `address` in the fetch body.
+  - [ ] Run unit test — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Navigate to `http://127.0.0.1:3847/register` → Page renders 5 fields: Full Name, Email, Phone, Address, Password → ✅
+  - [ ] Fill all fields including phone "+1-555-0199" and address "456 Chain St, Austin TX 78701" → Click "Create Account & Wallet" → Registration succeeds → Redirected to `/wallet` (or `/verify` after W-902 is implemented) → ✅
+  - [ ] In Prisma Studio / psql on `coin_caret_dev`: `SELECT phone_number, address FROM profiles WHERE user_id = '<new-user-id>'` → Returns correct values → ✅
+  - [ ] Submit without phone number → "Phone number is required" validation error shown → ✅
+  - [ ] ✅ Done.
+
+---
+
+##### W-902 — KYC Document Submission: SSN + Document Uploads via DocumentStorageService
+
+**Root cause:** Financial compliance requires verifying user identity before they can transact. Three document types (SSN card, Federal ID, Driver's License) plus the SSN number itself must be collected securely. The SSN value is personally identifiable information (PII) and must be encrypted at rest with AES-256. Document files are stored as Base64 in PostgreSQL via an abstraction layer (`DocumentStorageService`) that supports future migration to Cloudflare R2 or Railway Volumes with zero refactoring.
+
+**Goal:** A `/verify` page is available after registration. It collects SSN number (encrypted), SSN card image/PDF, Federal Government ID document, and Driver's License document. Submitting creates a `UserVerification` record and three `KycDocument` records. The user's verification status transitions to `SUBMITTED` (auto mode) or `PENDING_REVIEW` (manual mode) based on the current `KYC_REVIEW_MODE` platform config. In `automatic` mode, status immediately becomes `APPROVED`.
+
+**Approach:** Add `UserVerification` and `KycDocument` models. Build `DocumentStorageService` with `save()` / `retrieve()` / `delete()` interface. Build `KycService` with `submitVerification()`. Expose `POST /api/kyc/submit` route (multipart form). Build the `/verify` UI page with drag-and-drop or file-picker uploads.
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/kyc-submission.integration.test.ts`):**
+  - [ ] Test 1 (Auto mode): Seed `KYC_REVIEW_MODE = "automatic"` in `platform_config`. Submit SSN `"123-45-6789"` + 3 file buffers via `POST /api/kyc/submit` as authenticated user → `UserVerification.status === "APPROVED"` → `KycDocument` count for user === 3. SSN stored encrypted (raw DB value does NOT equal `"123-45-6789"`).
+  - [ ] Test 2 (Manual mode): Set `KYC_REVIEW_MODE = "manual"`. Submit same docs → `UserVerification.status === "PENDING_REVIEW"`. User cannot access wallet (gate check returns `AWAITING_REVIEW`).
+  - [ ] Test 3: Submit duplicate SSN submission (same userId) → HTTP 409 Conflict (UserVerification row already exists, must use re-upload endpoint).
+  - [ ] Test 4: Submit with SSN field empty → HTTP 400 Bad Request.
+  - [ ] Test 5: Submit with only 2 documents (missing driver's license) → HTTP 400 Bad Request specifying which document is missing.
+  - [ ] Test 6: File size exceeds 10 MB → HTTP 413 Payload Too Large.
+  - [ ] Test 7: Decrypt stored SSN from DB → Decrypted value matches original `"123-45-6789"` → Confirms AES-256 round-trip.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Schema] Add to `prisma/schema.prisma` (same migration `20260918000000_add_kyc_and_extended_profile`):
+
+    ```prisma
+    enum KycDocumentType {
+      SSN_CARD
+      FEDERAL_ID
+      DRIVING_LICENSE
+    }
+
+    enum KycVerificationStatus {
+      NOT_SUBMITTED
+      SUBMITTED
+      PENDING_REVIEW
+      APPROVED
+      REJECTED
+    }
+
+    model UserVerification {
+      id              String                 @id @default(uuid())
+      userId          String                 @unique
+      user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+      ssnEncrypted    String                 // AES-256-GCM encrypted SSN — NEVER stored plaintext
+      ssnIv           String                 // AES-256 initialization vector (stored separately)
+      ssnAuthTag      String                 // AES-256-GCM authentication tag
+      status          KycVerificationStatus  @default(NOT_SUBMITTED)
+      reviewNotes     String?                // Admin rejection reason or approval notes
+      reviewedByUserId String?
+      reviewedByUser  User?                  @relation("KycReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+      reviewedAt      DateTime?
+      submittedAt     DateTime?
+      createdAt       DateTime               @default(now())
+      updatedAt       DateTime               @updatedAt
+      documents       KycDocument[]
+
+      @@map("user_verifications")
+    }
+
+    model KycDocument {
+      id                String          @id @default(uuid())
+      userVerificationId String
+      userVerification  UserVerification @relation(fields: [userVerificationId], references: [id], onDelete: Cascade)
+      documentType      KycDocumentType
+      originalFileName  String
+      mimeType          String          // "image/jpeg", "image/png", "application/pdf"
+      fileSizeBytes     Int
+      storageBackend    String          @default("postgres") // "postgres" | "r2" | "railway_volume"
+      storageRef        String          // DB mode: same as id | R2 mode: object key
+      base64Data        String?         @db.Text // Only populated in "postgres" storage mode
+      uploadedAt        DateTime        @default(now())
+
+      @@unique([userVerificationId, documentType])
+      @@index([userVerificationId])
+      @@map("kyc_documents")
+    }
+    ```
+
+  - [ ] [Schema] Add to `User` model in `prisma/schema.prisma`:
+    ```prisma
+    kycRequired         Boolean          @default(true)
+    verification        UserVerification?
+    kycReviews          UserVerification[] @relation("KycReviewedBy")
+    ```
+
+  - [ ] [Service] Create `src/modules/kyc/service/document-storage.service.ts`:
+    - Implements `IDocumentStorage` interface: `save(fileName, buffer, mimeType, verificationId): Promise<KycDocument>` and `retrieve(kycDocumentId): Promise<Buffer>`.
+    - In `postgres` mode: base64-encodes buffer, creates `KycDocument` row with `base64Data` set, `storageBackend = "postgres"`, `storageRef = kycDocument.id`.
+    - `retrieve()` reads `base64Data`, decodes Buffer, returns it.
+    - **Key rule:** The interface is the only thing the KYC service calls. Swapping to R2 in future only requires replacing the implementation body — zero changes elsewhere.
+
+  - [ ] [Service] Create `src/modules/kyc/service/kyc-encryption.service.ts`:
+    - `encryptSsn(plainSsn: string): { encrypted: string, iv: string, authTag: string }` — uses Node.js `crypto.createCipheriv("aes-256-gcm", KEY, iv)`.
+    - `decryptSsn(encrypted: string, iv: string, authTag: string): string` — reverse operation.
+    - Key is read from `process.env.KYC_ENCRYPTION_KEY` (32-byte hex). Throws `MissingEncryptionKeyError` if not set.
+    - **Critical rule:** NEVER log, return in API response, or expose plaintext SSN after encryption completes.
+
+  - [ ] [Service] Create `src/modules/kyc/service/kyc.service.ts`:
+    - `submitVerification({ userId, ssnPlaintext, documents: { ssnCard, federalId, drivingLicense } })`:
+      1. Checks if `UserVerification` already exists for `userId` → throws `AlreadySubmittedError` (409).
+      2. Encrypts SSN via `kycEncryptionService.encryptSsn()`.
+      3. Reads `KYC_REVIEW_MODE` from `PlatformConfig`.
+      4. Sets initial status: `automatic` → `APPROVED`; `manual` → `PENDING_REVIEW`.
+      5. Creates `UserVerification` + 3 `KycDocument` rows atomically via `prisma.$transaction`.
+      6. Writes `AuditLog` entry: `action: "KYC_SUBMITTED"`, `entityType: "UserVerification"`.
+    - `resubmitVerification({ userId, ... })` — for rejected users who need to re-upload:
+      1. Existing `UserVerification` must be in `REJECTED` status.
+      2. Deletes old `KycDocument` rows, re-encrypts SSN, resets status.
+    - `approveVerification({ verificationId, reviewerUserId, notes })` — admin action.
+    - `rejectVerification({ verificationId, reviewerUserId, notes })` — admin action.
+    - `getVerificationStatus(userId)` → Returns `KycVerificationStatus`.
+
+  - [ ] [Repository] Create `src/modules/kyc/repository/kyc.repository.ts`:
+    - `findByUserId(userId)`: Finds `UserVerification` with documents included.
+    - `createVerification(data)`: Prisma create.
+    - `updateVerificationStatus(id, status, reviewData?)`: Updates status + reviewer fields.
+    - `findAllWithUsers(pagination)`: For admin users list page — finds all verifications with user data.
+
+  - [ ] [Controller] Create `src/app/api/kyc/submit/route.ts`:
+    - `POST` — authenticated session required.
+    - Parses `multipart/form-data` using the Next.js `request.formData()` API.
+    - Extracts: `ssn` (string field), `ssnCard` (File), `federalId` (File), `drivingLicense` (File).
+    - Validates: all 4 fields present, SSN matches regex `/^\d{3}-\d{2}-\d{4}$/`, each file ≤ 10 MB, mimeType in `["image/jpeg", "image/png", "application/pdf"]`.
+    - Calls `kycService.submitVerification()`.
+    - Returns HTTP 201 with `{ verificationId, status }`.
+
+  - [ ] [Controller] Create `src/app/api/kyc/status/route.ts`:
+    - `GET` — authenticated session required.
+    - Returns `{ status: KycVerificationStatus, reviewNotes?: string }` for the current user.
+
+  - [ ] Update `next.config.mjs` to allow larger API body for KYC route:
+    ```javascript
+    // next.config.mjs — add api body size config
+    // Note: Next.js App Router uses Request API, not legacy bodyParser.
+    // File size enforcement is done in the route handler itself via file.size check.
+    ```
+    > **Note:** In Next.js App Router (v14+), the legacy `api.bodyParser` config does not apply. File size must be validated in the route handler by checking `file.size` on each `File` object from `formData()`. No `next.config.mjs` change is needed for this.
+
+  - [ ] [Types] Update `src/types/user.ts` — add:
+    ```typescript
+    export type KycVerificationStatus = "NOT_SUBMITTED" | "SUBMITTED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+    export type KycDocumentType = "SSN_CARD" | "FEDERAL_ID" | "DRIVING_LICENSE";
+    export interface KycSubmitRequest { ssn: string; /* files handled as FormData */ }
+    export interface KycStatusResponse { status: KycVerificationStatus; reviewNotes?: string | null; submittedAt?: string | null; }
+    export interface KycDocumentDto { id: string; documentType: KycDocumentType; originalFileName: string; mimeType: string; fileSizeBytes: number; uploadedAt: string; }
+    export interface UserVerificationDto { id: string; userId: string; status: KycVerificationStatus; reviewNotes?: string | null; documents: KycDocumentDto[]; submittedAt?: string | null; reviewedAt?: string | null; }
+    ```
+
+  - [ ] Run integration test — **confirm GREEN.**
+
+- [ ] **RED — Unit (`src/tests/unit/kyc-encryption.test.ts`):**
+  - [ ] Test: `encryptSsn("123-45-6789")` → Returns `{ encrypted, iv, authTag }` where `encrypted !== "123-45-6789"`.
+  - [ ] Test: `decryptSsn(encrypted, iv, authTag)` → Returns `"123-45-6789"` exactly (round-trip).
+  - [ ] Test: `encryptSsn("123-45-6789")` called twice produces different `iv` values (non-deterministic IV — prevents rainbow table attacks).
+  - [ ] Test: `decryptSsn` with a tampered `authTag` → throws `DecryptionError` (GCM authentication failure).
+  - [ ] Test: `encryptSsn` with `KYC_ENCRYPTION_KEY` unset → throws `MissingEncryptionKeyError`.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Page] Create `src/app/(wallet)/verify/page.tsx` — KYC verification upload page:
+    - Session-guarded (redirect to `/login` if not authenticated).
+    - If user is already `APPROVED`, redirect to `/wallet`.
+    - If user is `PENDING_REVIEW`, show a "Documents Under Review" holding screen with animated clock icon.
+    - If user is `REJECTED`, show rejection reason and allow re-upload.
+    - If `NOT_SUBMITTED`, render the upload form.
+    - **Form layout:** 4 sections:
+      1. **SSN Number** — text input with mask `XXX-XX-XXXX`, validation regex client-side.
+      2. **SSN Card Document** — drag-and-drop or file picker. Accepts JPG, PNG, PDF. Shows file name and size after selection. Max 10 MB enforced client-side.
+      3. **Federal Government ID** — same drag-and-drop component.
+      4. **Driver's License** — same drag-and-drop component.
+    - Submit button: "Submit Verification Documents".
+    - On success: shows either "Verification Approved" (auto mode) or "Documents Submitted — Pending Review" (manual mode).
+    - Visual styling: premium dark card layout matching existing auth pages, amber/yellow accent color for verification theme (distinct from wallet's emerald).
+
+  - [ ] [Component] Create `src/components/kyc/DocumentUploadZone.tsx`:
+    - Props: `label: string`, `documentType: KycDocumentType`, `onFileSelected: (file: File) => void`, `selectedFile: File | null`.
+    - Shows upload icon + dashed border when empty; shows file name + size + green checkmark when file selected.
+    - Accepts: `accept="image/jpeg,image/png,application/pdf"`.
+    - Client-side validation: file.size > 10 * 1024 * 1024 → shows inline error "File exceeds 10 MB limit".
+
+  - [ ] Run unit test — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Register new user → Redirected to `/verify` (after W-903 gate is in place; for now navigate manually) → Page renders 4 upload sections → ✅
+  - [ ] Fill SSN "987-65-4321", attach 3 valid JPG files → Click Submit → HTTP 201 response → ✅
+  - [ ] `KYC_REVIEW_MODE = "automatic"`: Status shows "Verification Approved" immediately → ✅
+  - [ ] `KYC_REVIEW_MODE = "manual"`: Status shows "Pending Review" → ✅
+  - [ ] Check DB: `SELECT ssn_encrypted FROM user_verifications` → Value is NOT "987-65-4321" (encrypted) → ✅
+  - [ ] Check DB: `SELECT COUNT(*) FROM kyc_documents WHERE user_verification_id = '<id>'` → Returns 3 → ✅
+  - [ ] ✅ Done.
+
+---
+
+##### W-903 — KYC Platform Controls: Three PlatformConfig Toggles & Wallet Access Gate
+
+**Root cause:** The admin must control KYC behaviour at the platform level. Two config keys must exist in `platform_config`: `KYC_REQUIRED` (is KYC enforced at all?) and `KYC_REVIEW_MODE` (are uploaded docs auto-approved or manually reviewed?). These keys already have a home in the `PlatformConfig` table (no migration needed). The wallet layout (`/wallet`, `/send`, `/receive`, `/withdraw`, `/swap`) must read a user's KYC status on every request and redirect unverified users to `/verify` or a holding page.
+
+**Goal:** When `KYC_REQUIRED = "true"` and a user has not completed KYC, navigating to any wallet route redirects them. When `KYC_REQUIRED = "false"`, all users pass freely regardless of document status. The admin can update these values from `/admin/settings`.
+
+**Approach:** Add `KYC_REQUIRED` and `KYC_REVIEW_MODE` to the seed. Build `KycGateService` with `getAccessStatus(userId)`. Update wallet route group `layout.tsx` to call the gate. Add toggles to the admin settings page.
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/kyc-gate.integration.test.ts`):**
+  - [ ] Test 1: `KYC_REQUIRED = "false"` → `kycGateService.getAccessStatus(userId)` returns `"FULL_ACCESS"` regardless of `UserVerification` status.
+  - [ ] Test 2: `KYC_REQUIRED = "true"`, user has no `UserVerification` row → Returns `"NEEDS_UPLOAD"`.
+  - [ ] Test 3: `KYC_REQUIRED = "true"`, `KYC_REVIEW_MODE = "manual"`, user status = `PENDING_REVIEW` → Returns `"AWAITING_REVIEW"`.
+  - [ ] Test 4: `KYC_REQUIRED = "true"`, user status = `APPROVED` → Returns `"FULL_ACCESS"`.
+  - [ ] Test 5: `KYC_REQUIRED = "true"`, user status = `REJECTED` → Returns `"REJECTED_REUPLOAD"`.
+  - [ ] Test 6: `KYC_REQUIRED = "true"`, per-user `kycRequired = false` (override) → Returns `"FULL_ACCESS"` regardless of platform mode.
+  - [ ] Test 7: `PATCH /api/admin/config` with `{ key: "KYC_REQUIRED", value: "true" }` as Platform Owner → HTTP 200. As regular USER → HTTP 403.
+  - [ ] Test 8: `PATCH /api/admin/config` with `{ key: "KYC_REVIEW_MODE", value: "invalid_value" }` → HTTP 400 Bad Request (only `"automatic"` or `"manual"` accepted).
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Service] Create `src/modules/kyc/service/kyc-gate.service.ts`:
+    - `getAccessStatus(userId: string): Promise<KycAccessStatus>`:
+      1. Fetch `KYC_REQUIRED` from `PlatformConfig` — if `"false"`, return `"FULL_ACCESS"`.
+      2. Fetch user's `kycRequired` boolean from DB — if `false`, return `"FULL_ACCESS"`.
+      3. Fetch user's `UserVerification` row.
+      4. If no row or `status === "NOT_SUBMITTED"`, return `"NEEDS_UPLOAD"`.
+      5. If `status === "PENDING_REVIEW"`, return `"AWAITING_REVIEW"`.
+      6. If `status === "REJECTED"`, return `"REJECTED_REUPLOAD"`.
+      7. If `status === "APPROVED"`, return `"FULL_ACCESS"`.
+    - Export type: `type KycAccessStatus = "FULL_ACCESS" | "NEEDS_UPLOAD" | "AWAITING_REVIEW" | "REJECTED_REUPLOAD"`
+
+  - [ ] [Controller] Update `src/app/api/admin/config/route.ts` — Add validation in `PATCH` handler:
+    - When `key === "KYC_REVIEW_MODE"`, validate value must be `"automatic"` or `"manual"` only — else return HTTP 400.
+    - When `key === "KYC_REQUIRED"`, validate value must be `"true"` or `"false"` only — else return HTTP 400.
+
+  - [ ] [Controller] Create `src/app/api/kyc/gate/route.ts`:
+    - `GET` — authenticated session required.
+    - Calls `kycGateService.getAccessStatus(session.userId)`.
+    - Returns `{ accessStatus: KycAccessStatus }`.
+    - Used by wallet layout client-side to determine redirect behavior.
+
+  - [ ] [Layout] Update `src/app/(wallet)/layout.tsx`:
+    - Server component: fetch `GET /api/kyc/gate` (or call `kycGateService` directly since it's a server component).
+    - If `accessStatus === "NEEDS_UPLOAD"` → `redirect("/verify")`.
+    - If `accessStatus === "AWAITING_REVIEW"` → render a full-screen overlay (not a redirect) showing "Your documents are under review. You'll have full access once approved."
+    - If `accessStatus === "REJECTED_REUPLOAD"` → `redirect("/verify?reason=rejected")`.
+    - If `accessStatus === "FULL_ACCESS"` → render children normally.
+
+  - [ ] [Types] Update `src/types/user.ts` — add `KycAccessStatus` type.
+
+  - [ ] Run integration test — **confirm GREEN.**
+
+- [ ] **RED — Unit (`src/tests/unit/kyc-gate.test.ts`):**
+  - [ ] Test: `getAccessStatus` with mocked `KYC_REQUIRED = "false"` returns `"FULL_ACCESS"` without querying `UserVerification`.
+  - [ ] Test: `getAccessStatus` with mocked user `kycRequired = false` returns `"FULL_ACCESS"`.
+  - [ ] Test: Status state machine covers all 5 enum values correctly.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Page] Update `src/app/(admin)/admin/settings/page.tsx`:
+    - Add two new toggle sections below the existing CC/USD Rate form:
+      1. **KYC Required (Platform-Wide):** Toggle switch — OFF = no KYC needed, ON = KYC enforced. Calls `PATCH /api/admin/config` with `{ key: "KYC_REQUIRED", value: "true"/"false" }`.
+      2. **KYC Review Mode:** Toggle switch — OFF = Automatic (instant approval), ON = Manual (admin review required). Calls `PATCH /api/admin/config` with `{ key: "KYC_REVIEW_MODE", value: "automatic"/"manual" }`.
+    - Both toggles show current DB state on load.
+    - Show success toast on save.
+
+  - [ ] [Component] Create `src/components/admin/KycConfigPanel.tsx`:
+    - Renders both toggles with descriptive labels, subtext, and visual state indicators.
+    - Used in the admin settings page.
+
+  - [ ] Run unit test — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Log in as admin → `/admin/settings` → KYC section shows two toggles → ✅
+  - [ ] Toggle `KYC_REQUIRED` to ON → Save → DB row updated → ✅
+  - [ ] Log in as new user (no KYC) → Navigate to `/wallet` → Redirected to `/verify` → ✅
+  - [ ] Toggle `KYC_REQUIRED` to OFF → Log in as same user → `/wallet` loads normally → ✅
+  - [ ] Set `KYC_REVIEW_MODE` to Manual → User uploads docs → Status stays `PENDING_REVIEW` → Wallet shows "under review" overlay → ✅
+  - [ ] ✅ Done.
+
+---
+
+##### W-904 — Per-User KYC Override Toggle
+
+**Root cause:** The platform-level KYC toggle is a global setting. Admins need to exempt specific users from KYC without disabling it platform-wide — for example, exempting the demo account or a VIP client. The `kycRequired Boolean` field was added to `User` in the W-901/902 migration; this work item wires up the admin API and UI to toggle it.
+
+**Goal:** Admin can toggle `user.kycRequired` for any individual user from the admin user list page. When `user.kycRequired = false`, that user bypasses KYC even if `KYC_REQUIRED = "true"` platform-wide. The `KycGateService` already respects this (implemented in W-903).
+
+**Approach:** Expose `PATCH /api/admin/users/[userId]/kyc-toggle` endpoint. Wire it up in the admin user detail page (W-906).
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/per-user-kyc-toggle.integration.test.ts`):**
+  - [ ] Test 1: `PATCH /api/admin/users/[userId]/kyc-toggle` with `{ kycRequired: false }` as Platform Owner → `user.kycRequired === false` in DB → HTTP 200.
+  - [ ] Test 2: Same request as regular `USER` role → HTTP 403 Forbidden.
+  - [ ] Test 3: After toggle to `false`, `kycGateService.getAccessStatus(userId)` returns `"FULL_ACCESS"` even when `KYC_REQUIRED = "true"` platform-wide.
+  - [ ] Test 4: Toggle to `false` writes `AuditLog` entry: `action: "KYC_USER_OVERRIDE"`, `beforeState: { kycRequired: true }`, `afterState: { kycRequired: false }`.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Controller] Create `src/app/api/admin/users/[userId]/kyc-toggle/route.ts`:
+    - `PATCH` — requires `admin:users:manage` permission (Platform Owner + Operations Admin).
+    - Zod body: `{ kycRequired: z.boolean() }`.
+    - Updates `user.kycRequired` in DB.
+    - Writes `AuditLog` entry.
+    - Returns HTTP 200 with `{ userId, kycRequired: boolean }`.
+
+  - [ ] [Service] Create `src/modules/admin/service/user-management.service.ts`:
+    - `toggleUserKyc(userId, kycRequired, actorUserId)`: Validates user exists, updates field, writes audit log.
+    - `getUserWithVerification(userId)`: Returns user + profile + verification + documents (for admin detail page).
+    - `getAllUsersWithKycStatus(pagination)`: Returns paginated list of users with their verification status.
+
+  - [ ] [Repository] Create `src/modules/admin/repository/user-management.repository.ts`:
+    - `findAllUsers({ skip, take })`: `prisma.user.findMany` including `profile`, `verification`, `roles`.
+    - `findUserById(userId)`: Full user detail with verification and KYC documents.
+    - `updateKycRequired(userId, value)`: Atomic update of `kycRequired` field.
+
+  - [ ] Run integration test — **confirm GREEN.**
+
+- [ ] **RED — Unit (`src/tests/unit/user-management.test.ts`):**
+  - [ ] Test: `toggleUserKyc` with non-existent userId → throws `UserNotFoundError`.
+  - [ ] Test: `toggleUserKyc` writes correct `beforeState`/`afterState` to audit log.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Types] Update `src/types/user.ts` — add `AdminUserListItem`, `AdminUserDetail` DTOs.
+  - [ ] Run unit test — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Set `KYC_REQUIRED = "true"` platform-wide → ✅
+  - [ ] Find demo user in `/admin/users/[userId]` → Toggle `KYC Required` to OFF for this user → ✅
+  - [ ] Log in as demo user → Navigate to `/wallet` → Access granted (no redirect to `/verify`) → ✅
+  - [ ] Check audit log `/admin/audit-logs` → Entry shows `KYC_USER_OVERRIDE` with before/after → ✅
+  - [ ] ✅ Done.
+
+---
+
+##### W-905 — Admin Users List Page: `/admin/users`
+
+**Root cause:** There is currently no admin page to view, search, or manage registered users. All user data is invisible to admins unless they query the database directly. This creates a fundamental operational gap — admins cannot see who has registered, check KYC status, or take action on accounts.
+
+**Goal:** `/admin/users` renders a paginated, searchable table of all registered users. Each row shows: Name, Email, Phone, Registration Date, Account Status, and KYC Status badge. Clicking a row navigates to the user detail page.
+
+**Approach:** New server-rendered page calling `getAllUsersWithKycStatus()`. Pagination via `?page=N`. Search via `?q=term` filtered server-side on email/name. No new API route needed — server component queries directly (admin surface).
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/admin-users-list.integration.test.ts`):**
+  - [ ] Test 1: Seed 3 users → `GET /api/admin/users` → Returns array of 3 user objects each with `id`, `email`, `displayName`, `phoneNumber`, `createdAt`, `kycStatus`, `accountStatus`.
+  - [ ] Test 2: `GET /api/admin/users?q=alice` → Returns only users matching "alice" in name or email.
+  - [ ] Test 3: `GET /api/admin/users?page=2&limit=10` → Returns correct slice.
+  - [ ] Test 4: `GET /api/admin/users` as regular `USER` role → HTTP 403 Forbidden.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Controller] Create `src/app/api/admin/users/route.ts`:
+    - `GET` — requires `admin:users:manage` permission.
+    - Query params: `q?: string` (search), `page?: number` (default 1), `limit?: number` (default 20, max 100).
+    - Calls `userManagementService.getAllUsersWithKycStatus({ search: q, skip, take })`.
+    - Returns `{ users: AdminUserListItem[], total: number, page: number, totalPages: number }`.
+
+  - [ ] Update `src/modules/admin/repository/user-management.repository.ts` — `findAllUsers()` accepts optional `search` string filtering on `email ILIKE %q%` or `displayName ILIKE %q%` via Prisma `where` clause.
+
+  - [ ] Run integration test — **confirm GREEN.**
+
+- [ ] **RED — Component (`src/tests/unit/components/AdminUsersList.test.tsx`):**
+  - [ ] Test: `AdminUsersTable` renders correct number of rows for given data.
+  - [ ] Test: KYC status badge shows correct color for each status (`APPROVED`=green, `PENDING_REVIEW`=blue, `REJECTED`=red, `NOT_SUBMITTED`=yellow, `KYC OFF`=gray).
+  - [ ] Test: Search input updates URL param on submit.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Page] Create `src/app/(admin)/admin/users/page.tsx`:
+    - Server component fetching users via `userManagementService.getAllUsersWithKycStatus()`.
+    - Renders search bar (updates URL `?q=` param), pagination controls.
+    - Renders `<AdminUsersTable users={users} />`.
+
+  - [ ] [Component] Create `src/components/admin/AdminUsersTable.tsx`:
+    - Table columns: `#`, `Name`, `Email`, `Phone`, `Registered`, `Status`, `KYC`, `Actions`.
+    - Each row: name + email in stacked cell, phone, relative date, `UserStatusBadge`, `KycStatusBadge`, "View" button linking to `/admin/users/[userId]`.
+
+  - [ ] [Component] Create `src/components/admin/KycStatusBadge.tsx`:
+    - Props: `status: KycVerificationStatus | "EXEMPT"`.
+    - Renders color-coded pill: `APPROVED`=emerald, `PENDING_REVIEW`=sky, `REJECTED`=rose, `NOT_SUBMITTED`=amber, `EXEMPT`=slate.
+
+  - [ ] [Component] Update `src/components/admin/AdminNavbar.tsx`:
+    - Add `Users` nav link pointing to `/admin/users`.
+
+  - [ ] Run component test — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Log in as admin → Click "Users" in admin navbar → `/admin/users` loads → Table shows all seeded users → ✅
+  - [ ] Demo user row shows `NOT_SUBMITTED` KYC badge (or `APPROVED` if KYC was auto-approved in seed) → ✅
+  - [ ] Type "user@" in search box → Table filters to matching user instantly → ✅
+  - [ ] Click "View" on demo user → Navigates to `/admin/users/[userId]` (W-906 page) → ✅
+  - [ ] ✅ Done.
+
+---
+
+##### W-906 — Admin User Detail Page: `/admin/users/[userId]` with KYC Review & Inline Treasury Minting
+
+**Root cause:** The admin needs a single unified page per user that shows all relevant information: full profile (name, email, phone, address), account status, KYC verification status, uploaded documents, and the ability to take action (approve/reject KYC, toggle per-user KYC, freeze account). Additionally, treasury minting — which currently requires navigating to `/admin/treasury` and selecting from a dropdown of 80+ wallets — should be available directly on this page, scoped to the user's own wallets.
+
+**Goal:** `/admin/users/[userId]` renders a full user profile with: identity info card, KYC status timeline, document viewer (view/download uploaded files), approve/reject actions, per-user KYC toggle, and a treasury mint panel showing all 8 user wallets as simple currency tiles (not a 80-item dropdown). No separate navigation to `/admin/treasury` is needed for minting.
+
+**Approach:** Server component page. Fetches user via `getUserWithVerification()`. Document retrieval via `GET /api/admin/kyc/document/[documentId]` which calls `documentStorageService.retrieve()`. Minting calls existing `POST /api/admin/treasury/mint` but with `recipientWalletId` pre-resolved from user's wallet list.
+
+---
+
+- [ ] **RED — Integration (`src/tests/integration/admin-user-detail.integration.test.ts`):**
+  - [ ] Test 1: `GET /api/admin/users/[userId]` → Returns full user object: `{ id, email, displayName, phoneNumber, address, kycRequired, status, verification: { status, documents: [...] }, wallets: [...] }`.
+  - [ ] Test 2: `GET /api/admin/users/non-existent-id` → HTTP 404 Not Found.
+  - [ ] Test 3: `POST /api/admin/users/[userId]/kyc-review` with `{ action: "APPROVE", notes: "Verified manually" }` as Platform Owner → `UserVerification.status === "APPROVED"` → AuditLog entry created.
+  - [ ] Test 4: `POST /api/admin/users/[userId]/kyc-review` with `{ action: "REJECT", notes: "ID unclear" }` → `UserVerification.status === "REJECTED"` → `reviewNotes === "ID unclear"`.
+  - [ ] Test 5: `POST /api/admin/users/[userId]/kyc-review` with `action: "APPROVE"` when no documents submitted → HTTP 422 Unprocessable Entity (cannot approve if no documents exist).
+  - [ ] Test 6: `GET /api/admin/kyc/document/[documentId]` → Returns document file as binary stream with correct `Content-Type` header. Non-admin → HTTP 403.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Backend:**
+  - [ ] [Controller] Create `src/app/api/admin/users/[userId]/route.ts`:
+    - `GET` — requires `admin:users:manage`.
+    - Calls `userManagementService.getUserWithVerification(userId)`.
+    - Returns full `AdminUserDetail` DTO including wallets with balances.
+
+  - [ ] [Controller] Create `src/app/api/admin/users/[userId]/kyc-review/route.ts`:
+    - `POST` — requires `admin:users:manage`.
+    - Zod body: `{ action: z.enum(["APPROVE", "REJECT"]), notes: z.string().min(1).max(1000) }`.
+    - Validates: if action is `APPROVE`, user must have `UserVerification` with at least 3 `KycDocument` records.
+    - Calls `kycService.approveVerification()` or `kycService.rejectVerification()`.
+    - Writes `AuditLog` entry: `action: "KYC_REVIEWED"`, includes decision and reviewer.
+    - Returns HTTP 200 with updated verification status.
+
+  - [ ] [Controller] Create `src/app/api/admin/kyc/document/[documentId]/route.ts`:
+    - `GET` — requires `admin:users:manage`.
+    - Calls `documentStorageService.retrieve(documentId)`.
+    - Returns `NextResponse` with the file buffer, `Content-Type` from the `KycDocument.mimeType` field.
+    - Sets `Content-Disposition: inline` for images (browser renders), `attachment` for PDFs (browser downloads).
+
+  - [ ] Run integration test — **confirm GREEN.**
+
+- [ ] **RED — Component (`src/tests/unit/components/AdminUserDetail.test.tsx`):**
+  - [ ] Test: `UserProfileCard` renders name, email, phone, address.
+  - [ ] Test: `KycReviewPanel` renders Approve and Reject buttons only when `status === "PENDING_REVIEW"`. Hides buttons when `APPROVED` or `NOT_SUBMITTED`.
+  - [ ] Test: `InlineTreasuryMint` renders 8 asset tiles (one per supported asset).
+  - [ ] Test: Selecting BTC tile and submitting calls `POST /api/admin/treasury/mint` with the BTC `walletId`.
+  - [ ] **Run — confirm RED.**
+
+- [ ] **GREEN — Frontend:**
+  - [ ] [Page] Create `src/app/(admin)/admin/users/[userId]/page.tsx`:
+    - Server component fetching full user detail.
+    - Layout: two-column on desktop, single-column on mobile.
+    - **Left column sections (top to bottom):**
+      1. `UserProfileCard` — avatar initials, name, email, phone, address, registration date, account status badge, `kycRequired` toggle.
+      2. `KycStatusTimeline` — shows the verification state machine stages with current position highlighted.
+      3. `KycDocumentViewer` — 3 document cards (SSN Card, Federal ID, Driver's License). Each card shows file name, size, upload date, and a "View Document" button (opens in new tab via `/api/admin/kyc/document/[id]`).
+      4. `KycReviewPanel` — visible only when `status === "PENDING_REVIEW"`. Textarea for notes + Approve (green) and Reject (red) buttons.
+    - **Right column sections:**
+      1. `InlineTreasuryMint` — Treasury minting panel scoped to this user.
+      2. `UserWalletsList` — Read-only list of all 8 wallets with current available balance.
+
+  - [ ] [Component] Create `src/components/admin/UserProfileCard.tsx`:
+    - Displays all profile fields.
+    - Includes the per-user `kycRequired` toggle (calls `PATCH /api/admin/users/[userId]/kyc-toggle`).
+    - Account status badge + "Suspend" / "Activate" account button (calls `PATCH /api/admin/users/[userId]/status`).
+
+  - [ ] [Component] Create `src/components/admin/KycDocumentViewer.tsx`:
+    - 3 document slots with conditional rendering: slot shows "Not uploaded" in muted style if no document for that type; shows file info + View button if uploaded.
+
+  - [ ] [Component] Create `src/components/admin/KycReviewPanel.tsx`:
+    - Textarea for review notes (required, min 5 chars).
+    - Two action buttons (Approve / Reject). On click: calls `POST /api/admin/users/[userId]/kyc-review`. Shows confirmation dialog before submit. Shows success/error toast after.
+
+  - [ ] [Component] Create `src/components/admin/InlineTreasuryMint.tsx`:
+    - Props: `userId: string`, `wallets: AdminUserWallet[]`.
+    - Renders 8 asset tiles in a responsive grid (each showing asset symbol, asset name, current available balance).
+    - Clicking a tile "selects" it (highlighted border).
+    - Below grid: amount input (Decimal, > 0) + reason textarea + "Mint to Wallet" button.
+    - On submit: calls `POST /api/admin/treasury/mint` with the selected wallet's `walletId`, `assetSymbol`, `amount`, `reason`.
+    - This REPLACES the functionality of the old `/admin/treasury` wallet dropdown for per-user minting. The `/admin/treasury` page can remain for bulk minting if needed, but individual user minting is now done here.
+
+  - [ ] [Component] Create `src/components/admin/UserWalletsList.tsx`:
+    - Read-only table of all 8 wallets: Asset, Address (truncated), Available Balance, Reserved Balance.
+
+  - [ ] Run component test — **confirm GREEN.**
+
+- [ ] **Verification chain:**
+  - [ ] Navigate to `/admin/users` → Click demo user → `/admin/users/[userId]` opens → ✅
+  - [ ] Profile card shows: "Apex Digital Capital", "user@coincaret.com", phone, address → ✅
+  - [ ] KYC documents section shows "Not uploaded" for all 3 slots (new user) → ✅
+  - [ ] Inline treasury: Click ETH tile → Enter `1.5` ETH → Reason "Demo ETH allocation" → Click Mint → Success toast → ✅
+  - [ ] Navigate to `/wallet` as that user → ETH balance shows `1.50000000 ETH` → ✅
+  - [ ] (Manual mode test) Log in as new user → Upload docs → Admin navigates to their detail page → `PENDING_REVIEW` status shown → Click Approve → Notes: "Verified identity" → Confirm → KYC status turns green `APPROVED` → User can now access wallet → ✅
+  - [ ] ✅ Done.
+
+---
+
+##### W-907 — Database Re-seeding: Clean Slate with All Phase 9 Data
+
+**Root cause:** The Phase 9 migration adds non-nullable fields (`phoneNumber`, `address`) to the `profiles` table and new boolean field (`kycRequired`) to `users`. The existing seed data does not include these values. The current admin and demo users in `prisma/seed.ts` must be updated to include complete profile data. Three new `PlatformConfig` keys must be seeded (`KYC_REQUIRED`, `KYC_REVIEW_MODE`). Both databases (`coin_caret_dev` and `coin_caret_test`) must be wiped and fully re-seeded.
+
+**Goal:** After W-907 is complete, both databases are clean, all migrations applied, and the seed creates: 2 users with full profiles (name, email, phone, address), correct KYC config defaults, and the demo user flagged as KYC-exempt (so the demo works without uploading documents).
+
+**Approach:** Update `prisma/seed.ts`. Add KYC config keys. Wipe and re-seed both databases. Confirm all existing integration tests still pass.
+
+---
+
+- [ ] **Pre-seeding checklist (manual, not automated):**
+  - [ ] Confirm `KYC_ENCRYPTION_KEY` is set in `.env` and `.env.test`.
+  - [ ] Confirm `npx prisma generate` has been run after the Phase 9 migration.
+  - [ ] Stop `npm run dev` to avoid DB connection conflicts during reset.
+
+- [ ] **GREEN — Seed Updates (`prisma/seed.ts`):**
+  - [ ] Update admin user creation block to include `profile` fields:
+    ```typescript
+    profile: { create: {
+      themePreference: "dark",
+      currencyDisplay: "USD",
+      phoneNumber: "+1-555-000-0001",
+      address: "1 Sovereign Treasury Plaza, New York, NY 10001",
+    }},
+    ```
+  - [ ] Add `kycRequired: false` to admin user (`admin@coincaret.com`) — admin is always exempt.
+
+  - [ ] Update demo user creation block to include `profile` fields:
+    ```typescript
+    profile: { create: {
+      themePreference: "dark",
+      currencyDisplay: "USD",
+      phoneNumber: "+1-555-000-0002",
+      address: "456 Apex Capital Tower, Austin, TX 78701",
+    }},
+    ```
+  - [ ] Add `kycRequired: false` to demo user (`user@coincaret.com`) — demo user bypasses KYC so the demo flows freely.
+
+  - [ ] Add KYC platform config seeds:
+    ```typescript
+    // KYC_REQUIRED — default: false (platform starts with KYC disabled)
+    await prisma.platformConfig.upsert({
+      where: { key: "KYC_REQUIRED" },
+      update: {},
+      create: { key: "KYC_REQUIRED", value: "false", description: "Platform-wide KYC enforcement toggle. true = KYC required, false = all users bypass KYC." },
+    });
+
+    // KYC_REVIEW_MODE — default: automatic (uploaded docs are instantly approved)
+    await prisma.platformConfig.upsert({
+      where: { key: "KYC_REVIEW_MODE" },
+      update: {},
+      create: { key: "KYC_REVIEW_MODE", value: "automatic", description: "KYC document review mode. automatic = instant approval on upload, manual = admin must review and approve." },
+    });
+    ```
+
+  - [ ] Update seed console output to include KYC status info:
+    ```typescript
+    console.log("  KYC Status: EXEMPT (kycRequired = false for both demo accounts)");
+    console.log("  KYC_REQUIRED: false (platform default — enable in /admin/settings)");
+    console.log("  KYC_REVIEW_MODE: automatic (platform default — change in /admin/settings)");
+    ```
+
+- [ ] **Database wipe & re-seed — Dev DB:**
+  ```bash
+  npx prisma migrate reset --force --skip-seed
+  npx prisma migrate deploy
+  npx prisma generate
+  npx prisma db seed
+  ```
+  - [ ] Confirm: seed completes with zero errors.
+  - [ ] Confirm: `SELECT phone_number, address FROM profiles` → Returns values for both users.
+  - [ ] Confirm: `SELECT kyc_required FROM users` → Both users show `false`.
+  - [ ] Confirm: `SELECT key, value FROM platform_config WHERE key LIKE 'KYC%'` → Returns 2 rows.
+
+- [ ] **Database wipe & re-seed — Test DB:**
+  ```bash
+  npx dotenv -e .env.test -- npx prisma migrate reset --force --skip-seed
+  npx dotenv -e .env.test -- npx prisma migrate deploy
+  npx dotenv -e .env.test -- npx prisma generate
+  ```
+  > The test DB seed is NOT run — integration tests handle their own data setup. Only migrations must be applied.
+
+- [ ] **Full test suite regression check after re-seed:**
+  ```bash
+  npm run test:unit
+  npm run test:integration
+  npm run build
+  ```
+  - [ ] All existing 67 unit tests pass.
+  - [ ] All existing 63 integration tests pass.
+  - [ ] All new Phase 9 tests pass.
+  - [ ] `npm run build` succeeds with zero TypeScript errors.
+
+- [ ] **Verification chain:**
+  - [ ] `npm run dev` → Server starts on `http://127.0.0.1:3847` → ✅
+  - [ ] Log in as `user@coincaret.com` / `Password123!` → Wallet dashboard loads (no KYC redirect since `KYC_REQUIRED=false`) → ✅
+  - [ ] Log in as `admin@coincaret.com` → `/admin/users` → Both users visible with full profile data → ✅
+  - [ ] `/admin/settings` → KYC toggles both in OFF/Automatic state as per seed defaults → ✅
+  - [ ] ✅ Done.
+
+---
+
+#### Environment Files — Full Change List
+
+###### `.env.example` — Add new variables:
+```bash
+# KYC Document Encryption (AES-256-GCM)
+# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# IMPORTANT: Never commit the actual key. Replace the placeholder below.
+KYC_ENCRYPTION_KEY="your-64-char-hex-string-here-generate-with-command-above"
+```
+
+###### `.env.test.example` — Add same variable:
+```bash
+# KYC Document Encryption for Test Environment
+# Must be a valid 64-char hex string. Can be a fixed test key (not production key).
+KYC_ENCRYPTION_KEY="0000000000000000000000000000000000000000000000000000000000000000"
+```
+> Using a fixed all-zeros key in test is acceptable because test data is disposable. Production must use a securely generated random key.
+
+###### `.env` (local developer copy) — Must manually add:
+```bash
+KYC_ENCRYPTION_KEY="<run: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">"
+```
+
+###### `.env.test` (local test copy) — Must manually add:
+```bash
+KYC_ENCRYPTION_KEY="0000000000000000000000000000000000000000000000000000000000000000"
+```
+
+---
+
+##### New Migration Summary
+
+| Migration Name | Phase | Tables Changed |
+|:---|:---:|:---|
+| `20260918000000_add_kyc_and_extended_profile` | 9 | `profiles` (adds `phoneNumber`, `address`), `users` (adds `kycRequired`), new `user_verifications`, new `kyc_documents`, new enums `KycDocumentType`, `KycVerificationStatus` |
+
+---
+
+#### New Files Created in Phase 9
+
+| File | Purpose |
+|:---|:---|
+| `src/modules/kyc/service/kyc.service.ts` | Core KYC business logic: submit, resubmit, approve, reject |
+| `src/modules/kyc/service/kyc-encryption.service.ts` | AES-256-GCM encryption/decryption for SSN |
+| `src/modules/kyc/service/kyc-gate.service.ts` | Access status resolver (FULL_ACCESS, NEEDS_UPLOAD, etc.) |
+| `src/modules/kyc/service/document-storage.service.ts` | IDocumentStorage abstraction (postgres base64 implementation) |
+| `src/modules/kyc/repository/kyc.repository.ts` | Prisma queries for UserVerification and KycDocument |
+| `src/modules/admin/service/user-management.service.ts` | Admin user list, detail, KYC toggle logic |
+| `src/modules/admin/repository/user-management.repository.ts` | Prisma queries for admin user management |
+| `src/app/api/kyc/submit/route.ts` | POST multipart KYC submission |
+| `src/app/api/kyc/status/route.ts` | GET current user KYC status |
+| `src/app/api/kyc/gate/route.ts` | GET access gate status for wallet middleware |
+| `src/app/api/admin/users/route.ts` | GET paginated users list |
+| `src/app/api/admin/users/[userId]/route.ts` | GET single user detail |
+| `src/app/api/admin/users/[userId]/kyc-toggle/route.ts` | PATCH per-user KYC override |
+| `src/app/api/admin/users/[userId]/kyc-review/route.ts` | POST approve/reject KYC |
+| `src/app/api/admin/kyc/document/[documentId]/route.ts` | GET binary document stream for admin |
+| `src/app/(wallet)/verify/page.tsx` | KYC upload page for users |
+| `src/app/(admin)/admin/users/page.tsx` | Admin users list page |
+| `src/app/(admin)/admin/users/[userId]/page.tsx` | Admin user detail page |
+| `src/components/kyc/DocumentUploadZone.tsx` | Drag-and-drop file upload component |
+| `src/components/admin/AdminUsersTable.tsx` | Users table with KYC badges |
+| `src/components/admin/KycStatusBadge.tsx` | Color-coded KYC status pill |
+| `src/components/admin/KycConfigPanel.tsx` | Admin settings KYC toggle panel |
+| `src/components/admin/UserProfileCard.tsx` | User identity info card |
+| `src/components/admin/KycDocumentViewer.tsx` | Document slot viewer with view buttons |
+| `src/components/admin/KycReviewPanel.tsx` | Approve/reject action panel |
+| `src/components/admin/InlineTreasuryMint.tsx` | Per-user treasury minting (replaces dropdown UX) |
+| `src/components/admin/UserWalletsList.tsx` | Read-only 8-wallet balance table |
+| `src/tests/integration/extended-registration.integration.test.ts` | W-901 integration tests |
+| `src/tests/integration/kyc-submission.integration.test.ts` | W-902 integration tests |
+| `src/tests/integration/kyc-gate.integration.test.ts` | W-903 integration tests |
+| `src/tests/integration/per-user-kyc-toggle.integration.test.ts` | W-904 integration tests |
+| `src/tests/integration/admin-users-list.integration.test.ts` | W-905 integration tests |
+| `src/tests/integration/admin-user-detail.integration.test.ts` | W-906 integration tests |
+| `src/tests/unit/extended-registration.test.ts` | W-901 unit tests |
+| `src/tests/unit/kyc-encryption.test.ts` | W-902 encryption unit tests |
+| `src/tests/unit/kyc-gate.test.ts` | W-903 gate unit tests |
+| `src/tests/unit/user-management.test.ts` | W-904 unit tests |
+| `src/tests/unit/components/AdminUsersList.test.tsx` | W-905 component tests |
+| `src/tests/unit/components/AdminUserDetail.test.tsx` | W-906 component tests |
+
+---
+
+#### DocumentStorageService: Future Migration Path to Cloudflare R2
+
+When ready to migrate document storage from PostgreSQL base64 to Cloudflare R2:
+
+1. **Install:** `npm install @aws-sdk/client-s3` (R2 is S3-compatible).
+2. **Create:** `src/modules/kyc/service/document-storage-r2.service.ts` implementing the same `IDocumentStorage` interface.
+3. **Write migration script:** `scripts/migrate-docs-to-r2.ts` — reads each `KycDocument` row where `storageBackend = "postgres"`, uploads `base64Data` to R2, updates `storageRef` to R2 object key, sets `storageBackend = "r2"`, nulls out `base64Data`.
+4. **Swap implementation** in the DI binding — zero changes to `kyc.service.ts`, routes, or UI.
+5. **Add env vars** to `.env.example`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
+
+---
+
+#### Phase 9 Quality Gates (Must Pass Before Marking Complete)
+
+```bash
+npm run lint              # 0 ESLint errors
+npm run typecheck         # 0 TypeScript errors
+npm run test:unit         # All unit tests pass (67 existing + new Phase 9 tests)
+npm run test:integration  # All integration tests pass (63 existing + new Phase 9 tests)
+npm run build             # Clean production build
+```
+
+**Expected test counts after Phase 9:**
+- Unit tests: 67 (existing) + ~20 (new) = ~87 total
+- Integration tests: 63 (existing) + ~30 (new) = ~93 total
+
+---
+### Phase 10 — Full-Stack E2E Verification & Railway Deployment
 
 > **Objective:** Validate the complete multi-currency, multi-asset platform end-to-end with Playwright browser automation covering registration → funding (CC + BTC) → swap (CC→BTC) → transfer → block confirmation → Explorer verification. Then execute production deployment to Railway with multi-service architecture (Next.js web + block generator worker).
 
 ---
 
-#### W-901 — Comprehensive Multi-Currency E2E Playwright Test Suite
+#### W-1001 — Comprehensive Multi-Currency E2E Playwright Test Suite
 **Root cause:** After Phase 7 and Phase 8, the system has significantly more moving parts than the original CC-only loop. A complete automated E2E suite is required to verify: multi-asset wallet provisioning on registration, per-asset minting, internal swap execution, cross-asset transfers, block confirmations across asset types, and explorer query accuracy.
 **Goal:** Write and pass `src/tests/e2e/multi-currency-lifecycle.spec.ts` covering the full user journey with multiple assets.
 **Approach:** Playwright browser test against isolated test environment on port `4190`. Block generator worker runs in background. Tests are sequenced deterministically with known idempotency keys.
@@ -1111,7 +1997,7 @@ This document is the authoritative single source of truth for the implementation
 
 ---
 
-#### W-902 — Full `ci:quality` Gate & Production Build Verification
+#### W-1002 — Full `ci:quality` Gate & Production Build Verification
 **Root cause:** Before deployment, the complete quality gate (`lint + typecheck + unit + integration + build`) must pass with zero errors across all 8-asset routes, new swap endpoints, portfolio API, and updated marketing page.
 **Goal:** `npm run ci:quality` exits with code `0`. No TypeScript errors, no ESLint warnings, no failing unit or integration tests.
 **Approach:** Run quality gate, fix any regressions surfaced by the multi-currency additions, update test counts in `current_state.md`.
@@ -1131,7 +2017,7 @@ This document is the authoritative single source of truth for the implementation
 
 ---
 
-#### W-903 — Railway Production Deployment & Multi-Domain Verification
+#### W-1003 — Railway Production Deployment & Multi-Domain Verification
 **Root cause:** Verify that Next.js production build deploys successfully to Railway with all environment variables configured (multi-asset seed, CoinGecko key, DB URL), Prisma migrations applied, and all 4 surfaces (`coincaret.com`, `app.coincaret.com`, `explorer.coincaret.com`, `admin.coincaret.com`) routing correctly to the deployed service.
 **Goal:** All 4 custom domain surfaces load correctly on Railway. Multi-currency demo is fully accessible to the client with zero simulation watermarks.
 **Approach:** Push to Railway via GitHub Actions CI/CD. Run `prisma migrate deploy` and `prisma db seed` as Railway deploy commands. Verify multi-asset wallet provisioning, swap, and portfolio on the live deployment.
@@ -1154,38 +2040,3 @@ This document is the authoritative single source of truth for the implementation
   - [ ] Railway Web service + Worker service live → Client accesses live site → Full multi-currency demo functions with zero lag and 100% authenticity → ✅ Done.
 
 ---
-
-## 3. Session Notes
-
-### Session: Multi-Asset Send, Receive, Swap & Auto-Provisioning (2026-09-17 / 2026-09-18)
-
-#### Objectives & User Requests Addressed
-1. **Swap Dropdown Restriction:** Resolved issue where Swap form asset dropdown was only showing CC.
-2. **Multi-Asset Send & Receive Views:** Resolved issue where navigating to `/wallet/send` or `/wallet/receive` defaulted to CC only without an in-page asset selector.
-3. **Legacy User Wallet Provisioning:** Resolved issue where users created before multi-wallet architecture only had 1 wallet (CC) in the database.
-
-#### Key Architectural & Implementation Changes
-1. **Multi-Asset Send & Receive Asset Selectors (`SendForm`, `ReceiveCard`, `send/page.tsx`, `receive/page.tsx`):**
-   - Implemented interactive asset dropdowns in `SendForm` and `ReceiveCard` allowing instantaneous switching across all 8 supported cryptocurrencies (`CC`, `BTC`, `ETH`, `SOL`, `BNB`, `LTC`, `XRP`, `DOGE`).
-   - Switching assets immediately updates available balance, dynamic per-asset network fee schedule (`FEE_MAP`), cryptographic address formatting (`BTC0x...`, `ETH0x...`, etc.), QR codes, and send execution parameters.
-   - Synchronized client router state (`/wallet/send?asset=BTC`, `/wallet/receive?asset=BTC`) with parallel platform asset registry & user wallet summary fetching.
-
-2. **Automatic Multi-Wallet Lazy Provisioning (`ensureAllWalletsForUser`):**
-   - Added `ensureAllWalletsForUser(userId)` to `src/modules/wallets/service/wallet.service.ts`.
-   - Wired into `GET /api/wallet/summary` to ensure any user (legacy, seeded, or newly registered) automatically gets all 8 asset wallets, cryptographic deposit addresses, and ledger accounts (`AVAILABLE`, `RESERVED_PENDING`) provisioned on their first request.
-
-3. **Multi-Asset Send Backend Resolver (`resolveWalletForSend`):**
-   - Created `src/modules/wallets/service/wallet-resolver.service.ts` to resolve the exact source wallet by `assetSymbol` or `fromWalletId` with user ownership validation.
-   - Updated `POST /api/wallet/send` to support dynamic multi-asset transfers.
-
-4. **Asset Registry Prisma Singleton Refactor:**
-   - Fixed `src/modules/market/service/asset-registry.service.ts` to use shared `@/lib/prisma` client rather than spawning ad-hoc `new PrismaClient()` instances.
-
-5. **Multi-Asset Seed Overhaul (`prisma/seed.ts`):**
-   - Updated seed script to provision and fund all 8 asset wallets for `user@coincaret.com` with realistic demo balances (`CC=5000`, `BTC=0.15`, `ETH=2.5`, `SOL=35`, `BNB=8`, `LTC=12.5`, `XRP=1500`, `DOGE=8000`).
-
-#### TDD Verification & Quality Gates
-- **Unit Tests:** 81/81 passed across 28 test suites (including `MultiAssetSend.test.tsx`, `MultiAssetReceive.test.tsx`, `asset-registry-singleton.test.ts`).
-- **Integration Tests:** 71/71 passed across 23 test suites against live PostgreSQL (`multi-wallet-provisioning.integration.test.ts`, `multi-asset-send.integration.test.ts`, `swap-engine.integration.test.ts`).
-- **TypeScript:** 0 errors across entire codebase (`tsc --noEmit`).
-

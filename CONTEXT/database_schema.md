@@ -36,6 +36,22 @@ enum UserStatus {
   DEACTIVATED
 }
 
+// ---- Phase 9 additions ----
+enum KycDocumentType {
+  SSN_CARD
+  FEDERAL_ID
+  DRIVING_LICENSE
+}
+
+enum KycVerificationStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+// ----------------------------
+
 enum RoleName {
   PLATFORM_OWNER
   OPERATIONS_ADMIN
@@ -103,6 +119,7 @@ model User {
   passwordHash      String
   displayName       String
   status            UserStatus     @default(ACTIVE)
+  kycRequired       Boolean        @default(true)   // Phase 9: per-user KYC override
   emailVerifiedAt   DateTime?
   twoFactorEnabled  Boolean        @default(false)
   twoFactorSecret   String?
@@ -120,6 +137,8 @@ model User {
   approvedIssuances TreasuryIssuanceRequest[] @relation("ApprovedIssuances")
   platformConfigs   PlatformConfig[]
   assetPairRates    AssetPairRate[]
+  verification      UserVerification?          // Phase 9
+  kycReviews        UserVerification[]         @relation("KycReviewedBy") // Phase 9
 
   @@map("users")
 }
@@ -128,6 +147,8 @@ model Profile {
   id                String         @id @default(uuid())
   userId            String         @unique
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber       String         // Phase 9: required at registration
+  address           String         // Phase 9: required at registration
   themePreference   String         @default("dark")
   currencyDisplay   String         @default("USD")
   timezone          String         @default("UTC")
@@ -489,6 +510,49 @@ model AssetPairRate {
   @@index([toAssetId])
   @@map("asset_pair_rates")
 }
+
+// --------------------------------------------------------
+// KYC IDENTITY VERIFICATION (Phase 9)
+// --------------------------------------------------------
+
+model UserVerification {
+  id               String                @id @default(uuid())
+  userId           String                @unique
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ssnEncrypted     String                // AES-256-GCM ciphertext — NEVER plaintext
+  ssnIv            String                // Initialization vector for AES-GCM decryption
+  ssnAuthTag       String                // GCM authentication tag for tamper detection
+  status           KycVerificationStatus @default(NOT_SUBMITTED)
+  reviewNotes      String?               // Admin's written approval or rejection reason
+  reviewedByUserId String?
+  reviewedByUser   User?                 @relation("KycReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  submittedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  documents        KycDocument[]
+
+  @@map("user_verifications")
+}
+
+model KycDocument {
+  id                 String           @id @default(uuid())
+  userVerificationId String
+  userVerification   UserVerification @relation(fields: [userVerificationId], references: [id], onDelete: Cascade)
+  documentType       KycDocumentType
+  originalFileName   String
+  mimeType           String           // "image/jpeg" | "image/png" | "application/pdf"
+  fileSizeBytes      Int
+  storageBackend     String           @default("postgres") // "postgres" | "r2" | "railway_volume"
+  storageRef         String           // DB mode: same as id | R2 mode: S3 object key
+  base64Data         String?          @db.Text // Only populated when storageBackend = "postgres"
+  uploadedAt         DateTime         @default(now())
+
+  @@unique([userVerificationId, documentType])
+  @@index([userVerificationId])
+  @@map("kyc_documents")
+}
 ```
 
 ---
@@ -500,6 +564,7 @@ model AssetPairRate {
 | `20260916000000_init_coin_caret_schema` | 1 | Initial full schema: Users, Wallets, Ledger, Transactions, Blocks, Audit |
 | `20260916214127_add_platform_config_and_price_cache` | 6 | Adds `platform_config` key-value table and `external_price_feed_cache` table |
 | `20260917152223_add_asset_pair_rate_and_swap_support` | 8 | Adds `asset_pair_rates` table, `SWAP` enum to `TransactionType`, and self-referential `linkedTransactionId` on `Transaction` |
+| `20260918000000_add_kyc_and_extended_profile` | 9 | Adds `phoneNumber` + `address` to `profiles`; adds `kycRequired` to `users`; adds `user_verifications` and `kyc_documents` tables; adds `KycDocumentType` and `KycVerificationStatus` enums |
 
 ---
 
@@ -511,3 +576,17 @@ model AssetPairRate {
 - **CoinGecko Dynamic Fallback:** If no direct `AssetPairRate` row exists in the database for a requested pair, the system dynamically derives the cross-rate using the CoinGecko price cache: `(fromUsdPrice / toUsdPrice)`.
 - **RBAC:** Managed by `PLATFORM_OWNER` and `FINANCE_OPERATOR` roles via `PATCH /api/admin/exchange-rates`.
 - **Audit Trail:** Every rate mutation generates an immutable `AuditLog` entry tracking actor, old rate, and new rate.
+
+---
+
+### `UserVerification` (Phase 9)
+- **Purpose:** Tracks the KYC identity verification lifecycle for each user. One row per user (unique on `userId`).
+- **SSN Encryption:** `ssnEncrypted`, `ssnIv`, `ssnAuthTag` store the AES-256-GCM ciphertext, IV, and authentication tag separately. Decryption requires all three fields plus the `KYC_ENCRYPTION_KEY` environment variable. The plain SSN is NEVER stored.
+- **Status State Machine:** `NOT_SUBMITTED → SUBMITTED → PENDING_REVIEW → APPROVED | REJECTED`. Rejected users can resubmit, which resets to `SUBMITTED`.
+- **Review Mode Integration:** The `status` after submission is determined by the `KYC_REVIEW_MODE` platform config. `automatic` → immediately sets `APPROVED`. `manual` → sets `PENDING_REVIEW` until admin action.
+
+### `KycDocument` (Phase 9)
+- **Purpose:** Stores one uploaded file per document type per user verification. Unique constraint on `[userVerificationId, documentType]` prevents duplicate uploads per type.
+- **Storage Abstraction:** `storageBackend` field (`"postgres"`, `"r2"`, `"railway_volume"`) and `storageRef` field enable zero-refactor migration between storage backends. In PostgreSQL mode, `base64Data` holds the file. In R2 mode, `base64Data` is nulled and `storageRef` is the S3 object key.
+- **Supported MIME Types:** `image/jpeg`, `image/png`, `application/pdf`. Maximum file size: 10 MB (validated in route handler).
+- **Access Control:** Only admins with `admin:users:manage` permission can retrieve document binaries via `GET /api/admin/kyc/document/[documentId]`.

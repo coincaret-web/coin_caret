@@ -174,3 +174,60 @@ This document tracks all foundational architectural, financial, infrastructure, 
 - **Alternatives Rejected:**
   - **External DEX Integration (Uniswap/Raydium):** Requires real liquidity pools and blockchain gas funding; introduces latency and slippage unsuited for an internal institutional platform.
   - **Single Mixed Wallet Account:** Blending different assets into a single ledger account violates accounting normalization and makes per-asset balance auditing error-prone.
+
+---
+
+## ADR-013: KYC Identity Verification System, Extended User Profiles & Admin User Management
+
+- **Date:** 2026-09-18
+- **Status:** APPROVED
+- **Context:** The platform had no user identity verification, no admin visibility into registered users, a cumbersome treasury minting UX (global 80-item wallet dropdown), and a registration form collecting only name/email. Institutional and compliance requirements demand: extended contact profiles, identity document verification, admin controls over KYC enforcement, and a per-user admin management surface.
+
+### Decision 1: Extended Registration Fields
+- **Decision:** Add `phoneNumber` and `address` as required fields to the `profiles` table. Collected at registration alongside the existing `displayName`, `email`, and `password` fields.
+- **Rationale:** These are the four standard contact data points for any financial platform account. Stored on `Profile` (not `User`) to keep identity data cleanly separated from auth credentials. Both fields are required (not optional) to prevent incomplete records.
+
+### Decision 2: KYC Document Storage — PostgreSQL Base64 via IDocumentStorage Abstraction
+- **Decision:** Store uploaded KYC documents (SSN Card, Federal ID, Driver's License) as Base64-encoded text in a `KycDocument.base64Data` PostgreSQL column. Wrap all storage operations behind an `IDocumentStorage` interface (`save()`, `retrieve()`, `delete()`) in `DocumentStorageService`.
+- **Rationale:**
+  - **Zero additional infrastructure:** No S3 bucket, no R2 account, no Railway Volume configuration required at launch. Everything lives in the existing PostgreSQL database.
+  - **Migration-ready abstraction:** The `storageBackend` field (`"postgres"` | `"r2"` | `"railway_volume"`) and `storageRef` field enable a zero-refactor storage swap. When migrating to Cloudflare R2, only the service implementation body changes — routes, KYC service, and UI remain untouched.
+  - **Scale constraints acknowledged:** Base64 adds ~37% overhead. At 100 users (3 docs each, ~950 KB raw each) = ~130 MB in DB. Acceptable for early-stage. Migration to R2 is triggered when this becomes a cost concern.
+- **Alternatives Rejected:**
+  - **Immediate Cloudflare R2 integration:** Adds R2 account setup, `@aws-sdk/client-s3` dependency, and credential management overhead before the feature is even validated. Premature infrastructure cost.
+  - **Local filesystem storage:** Not viable for Railway deployment (ephemeral filesystem). Would require a persistence volume with no abstraction for future swap.
+
+### Decision 3: SSN Encryption — AES-256-GCM with Separate IV and Auth Tag Storage
+- **Decision:** The Social Security Number (SSN) is encrypted using Node.js `crypto.createCipheriv("aes-256-gcm", ...)` before any database write. The `ssnEncrypted`, `ssnIv`, and `ssnAuthTag` fields are stored separately in `UserVerification`. The encryption key is sourced exclusively from `process.env.KYC_ENCRYPTION_KEY` (64-char hex / 32 bytes).
+- **Rationale:**
+  - **GCM mode** provides both confidentiality (encryption) and integrity (authentication tag). A tampered ciphertext is detectable without attempting full decryption.
+  - **Random IV per encryption call** means the same SSN encrypted twice produces different ciphertext — preventing rainbow table / frequency analysis attacks.
+  - **Storing IV and AuthTag separately** from ciphertext follows the standard cryptographic practice and is required for decryption.
+  - **Never logs or returns plaintext SSN** after the encryption call completes. This is a hard rule enforced in `kyc-encryption.service.ts`.
+- **Key Management:** `KYC_ENCRYPTION_KEY` is added to `.env.example` as a placeholder comment. Each environment (dev, test, production) must have its own independently generated key. The test key is a fixed all-zeros value (acceptable for disposable test data).
+
+### Decision 4: KYC Access Gate — Three-Tier Control (Platform → Per-User → Verification Status)
+- **Decision:** The wallet access gate uses a three-tier resolution in strict priority order:
+  1. If `PlatformConfig.KYC_REQUIRED = "false"` → `FULL_ACCESS` (platform off, everyone passes).
+  2. If `User.kycRequired = false` → `FULL_ACCESS` (individual override).
+  3. Check `UserVerification.status` → `NEEDS_UPLOAD`, `AWAITING_REVIEW`, `REJECTED_REUPLOAD`, or `FULL_ACCESS`.
+- **Rationale:** This ordering ensures the most permissive rule wins (platform > user > document status), which is the correct compliance interpretation. Platform owners can shut off KYC entirely for development. Individual exemptions work without disrupting global policy.
+- **Gate enforcement:** The wallet route group `layout.tsx` (server component) resolves gate status on every render and either renders children, redirects to `/verify`, or shows an overlay. No client-side gating that can be bypassed.
+
+### Decision 5: KYC Review Mode — Automatic vs. Manual Toggle
+- **Decision:** Add `PlatformConfig.KYC_REVIEW_MODE` key with values `"automatic"` | `"manual"`. In automatic mode, document submission instantly sets status to `APPROVED`. In manual mode, status becomes `PENDING_REVIEW` until admin action.
+- **Rationale:**
+  - **Automatic** is ideal for demos, client onboarding previews, and development where friction must be zero.
+  - **Manual** matches real KYC workflows (Coinbase, Binance, etc.) where human review is a compliance requirement.
+  - Switching modes mid-operation does not affect already-approved users — only new submissions from that point forward are affected.
+- **Alternatives Rejected:**
+  - **Third-party KYC API (Stripe Identity, Jumio, Onfido):** Requires API keys, billing accounts, and webhook infrastructure. Adds external dependency for a platform that needs to remain fully self-contained. Can be integrated as a future V2 upgrade via the same `KycService` interface.
+
+### Decision 6: Admin Users Page & Per-User KYC Override
+- **Decision:** Introduce a new `/admin/users` list page and `/admin/users/[userId]` detail page. The detail page includes: full identity profile, KYC status timeline, uploaded document viewer (via binary stream endpoint), approve/reject actions, per-user `kycRequired` toggle, and inline treasury minting.
+- **Rationale:**
+  - **Single-user minting UX:** The existing `/admin/treasury` wallet picker lists all wallets across all users (8 assets × N users = N×8 entries in one dropdown). For 10 users = 80 entries. This is operationally unusable. Moving minting into the user profile page scopes the picker to that user's 8 wallets — reducing the selection to 8 labeled currency tiles.
+  - **No breaking change to treasury API:** The `POST /api/admin/treasury/mint` endpoint is unchanged. Only the UI component that calls it changes (from a global dropdown to a per-user inline panel).
+  - **`kycRequired` override:** Allows surgical exemption of specific users (e.g., the demo account, internal test users, VIP clients) without disabling platform-wide KYC.
+- **Alternatives Rejected:**
+  - **Keeping treasury on `/admin/treasury` with improved search:** A search/filter on the dropdown doesn't fix the UX — it still requires the admin to know which wallet ID belongs to which user and asset. Contextual per-user minting eliminates this cognitive overhead entirely.

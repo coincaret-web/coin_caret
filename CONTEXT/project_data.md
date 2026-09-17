@@ -53,7 +53,8 @@ src/
 │   │   ├── internal-engine/          # V1 Engine: High-speed double-entry block generator & mempool
 │   │   └── web3-engine/              # V2 Expansion: Plug-and-play adapter for real EVM/Solana RPCs
 │   ├── explorer/                     # Aggregated chain search & real-time block stats
-│   ├── admin/                        # Treasury minting, user freezing, withdrawal approvals
+│   ├── admin/                        # Treasury minting, user freezing, withdrawal approvals, user management
+│   ├── kyc/                          # KYC identity verification: document upload, encryption, gate service
 │   └── notifications/                # Webhook & in-app alerts for incoming/outgoing funds
 │
 ├── components/                       # Shared Design System (Tailwind, Radix UI, Charts, Modals)
@@ -115,8 +116,10 @@ Transactions advance deterministically through authoritative server-side states:
 | `wallet:read:own` | View own balances and addresses | ✅ | ✅ | ✅ | ❌ | ✅ |
 | `wallet:send` | Initiate transfers and withdrawals | ✅ | ✅ | ✅ | ❌ | ✅ |
 | `explorer:read` | Query public blocks and transactions | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `admin:users:manage` | Suspend, verify, or view user accounts | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `admin:treasury:mint` | Issue CC to user accounts / cohorts | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `admin:users:manage` | View all users, toggle KYC, review/approve/reject KYC documents, suspend accounts | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `admin:kyc:review` | Approve or reject submitted KYC documents, view encrypted document files | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `admin:config:write` | Update PlatformConfig keys including KYC_REQUIRED and KYC_REVIEW_MODE | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `admin:treasury:mint` | Issue any supported asset to user wallets (inline from user profile) | ✅ | ❌ | ✅ | ❌ | ❌ |
 | `admin:withdraw:review`| Approve or reject withdrawal requests | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `admin:network:config` | Adjust block intervals, gas fees, pause | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `admin:audit:read` | Access immutable system audit logs | ✅ | ✅ | ✅ | ✅ | ❌ |
@@ -131,3 +134,42 @@ Transactions advance deterministically through authoritative server-side states:
 - **Clean URL Slugs:** 100% RESTful clean URLs without `.html` extensions (e.g. `/wallet/send`, `/explorer/tx/[hash]`, `/whitepaper`).
 - **Structured Data (Schema.org JSON-LD):** Implemented for `Organization`, `FinancialProduct`, `SoftwareApplication`, and `BreadcrumbList`.
 - **Dynamic Sitemap:** Auto-generated `sitemap.xml` and `robots.txt` for maximum search engine indexability.
+
+---
+
+## 7. KYC Identity Verification System (Phase 9)
+
+### 7.1 Registration Data Collected
+Every user account requires: `displayName`, `email`, `password`, `phoneNumber`, and `address` (stored in `profiles` table).
+
+### 7.2 KYC Documents Required
+When KYC is enforced, users must upload to `/verify`:
+1. **SSN Number** — AES-256-GCM encrypted at rest. Never stored or logged in plaintext.
+2. **SSN Card Document** — Image (JPG/PNG) or PDF, max 10 MB.
+3. **Federal Government ID** — Image or PDF, max 10 MB.
+4. **Driver's License** — Image or PDF, max 10 MB.
+
+### 7.3 KYC Access Gate State Machine
+```text
+NOT_SUBMITTED  →  SUBMITTED  →  PENDING_REVIEW  →  APPROVED  (FULL_ACCESS)
+                                                 ↘  REJECTED  →  (re-upload) → SUBMITTED
+```
+- `NEEDS_UPLOAD` — No documents submitted. Wallet routes redirect to `/verify`.
+- `AWAITING_REVIEW` — Documents submitted in manual mode. Wallet shows overlay.
+- `REJECTED_REUPLOAD` — Admin rejected. User redirected to `/verify?reason=rejected`.
+- `FULL_ACCESS` — Approved, or KYC not required for this user/platform.
+
+### 7.4 Platform Config Keys for KYC
+| Key | Values | Default | Description |
+|:---|:---|:---|:---|
+| `KYC_REQUIRED` | `"true"` / `"false"` | `"false"` | Platform-wide KYC gate. False = all users bypass KYC. |
+| `KYC_REVIEW_MODE` | `"automatic"` / `"manual"` | `"automatic"` | Automatic = instant approval on upload. Manual = admin must review. |
+
+### 7.5 Per-User KYC Override
+- `User.kycRequired Boolean @default(true)` — When set to `false` by admin, that user bypasses KYC even if `KYC_REQUIRED = "true"` platform-wide.
+- The demo account (`user@coincaret.com`) is seeded with `kycRequired = false`.
+
+### 7.6 Document Storage Architecture
+- Current backend: **PostgreSQL base64** via `DocumentStorageService` abstraction (`IDocumentStorage` interface).
+- Future migration path: Swap to **Cloudflare R2** by replacing implementation class — zero changes to business logic, routes, or UI.
+- Environment variable: `KYC_ENCRYPTION_KEY` (64-char hex, AES-256 key). Required in `.env` and `.env.test`.
