@@ -74,6 +74,20 @@ enum BlockStatus {
   FINALIZED
 }
 
+enum KycDocumentType {
+  SSN_CARD
+  FEDERAL_ID
+  DRIVING_LICENSE
+}
+
+enum KycVerificationStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 // --------------------------------------------------------
 // IDENTITY & ACCESS (RBAC)
 // --------------------------------------------------------
@@ -87,10 +101,13 @@ model User {
   emailVerifiedAt   DateTime?
   twoFactorEnabled  Boolean        @default(false)
   twoFactorSecret   String?
+  kycRequired       Boolean        @default(true)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
   profile           Profile?
+  verification      UserVerification?
+  kycReviews        UserVerification[] @relation("KycReviewedBy")
   roles             UserRole[]
   wallets           Wallet[]
   sessions          Session[]
@@ -109,6 +126,8 @@ model Profile {
   id                String         @id @default(uuid())
   userId            String         @unique
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber       String
+  address           String
   themePreference   String         @default("dark")
   currencyDisplay   String         @default("USD")
   timezone          String         @default("UTC")
@@ -116,6 +135,45 @@ model Profile {
   updatedAt         DateTime       @updatedAt
 
   @@map("profiles")
+}
+
+model UserVerification {
+  id                String                 @id @default(uuid())
+  userId            String                 @unique
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ssnEncrypted      String
+  ssnIv             String
+  ssnAuthTag        String
+  status            KycVerificationStatus  @default(NOT_SUBMITTED)
+  reviewNotes       String?
+  reviewedByUserId  String?
+  reviewedByUser    User?                  @relation("KycReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  submittedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  documents         KycDocument[]
+
+  @@map("user_verifications")
+}
+
+model KycDocument {
+  id                 String          @id @default(uuid())
+  userVerificationId String
+  userVerification   UserVerification @relation(fields: [userVerificationId], references: [id], onDelete: Cascade)
+  documentType       KycDocumentType
+  originalFileName   String
+  mimeType           String
+  fileSizeBytes      Int
+  storageBackend     String          @default("postgres")
+  storageRef         String
+  base64Data         String?         @db.Text
+  uploadedAt         DateTime        @default(now())
+
+  @@unique([userVerificationId, documentType])
+  @@index([userVerificationId])
+  @@map("kyc_documents")
 }
 
 model Role {

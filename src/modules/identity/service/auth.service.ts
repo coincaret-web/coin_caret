@@ -14,6 +14,8 @@ export async function registerUser(input: {
   email: string;
   password: string;
   displayName: string;
+  phoneNumber?: string;
+  address?: string;
 }) {
   const existing = await findUserByEmail(input.email);
   if (existing) {
@@ -25,6 +27,8 @@ export async function registerUser(input: {
     email: input.email,
     passwordHash,
     displayName: input.displayName,
+    phoneNumber: input.phoneNumber || "+1-555-000-0000",
+    address: input.address || "1 Sovereign Plaza, Financial District",
   });
 
   // Auto-provision all 8 multi-asset wallets and ledger accounts atomically

@@ -1216,50 +1216,50 @@ This key must **never** be committed to source control. It is listed in `.env.ex
 
 ---
 
-- [ ] **RED — Integration (`src/tests/integration/extended-registration.integration.test.ts`):**
-  - [ ] Test 1: `POST /api/auth/register` with `{ displayName, email, password, phoneNumber: "+1-555-867-5309", address: "123 Blockchain Ave, NYC 10001" }` → Returns HTTP 201 → `prisma.profile.findUnique({ where: { userId } })` returns row with `phoneNumber` and `address` correctly stored.
-  - [ ] Test 2: `POST /api/auth/register` without `phoneNumber` → Returns **HTTP 400 Bad Request** (Zod validation: phoneNumber required).
-  - [ ] Test 3: `POST /api/auth/register` without `address` → Returns **HTTP 400 Bad Request** (Zod validation: address required).
-  - [ ] Test 4: `POST /api/auth/register` with `phoneNumber` containing fewer than 7 digits → Returns **HTTP 400 Bad Request**.
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Integration (`src/tests/integration/extended-registration.integration.test.ts`):**
+  - [x] Test 1: `POST /api/auth/register` with `{ displayName, email, password, phoneNumber: "+1-555-867-5309", address: "123 Blockchain Ave, NYC 10001" }` → Returns HTTP 201 → `prisma.profile.findUnique({ where: { userId } })` returns row with `phoneNumber` and `address` correctly stored.
+  - [x] Test 2: `POST /api/auth/register` without `phoneNumber` → Returns **HTTP 400 Bad Request** (Zod validation: phoneNumber required).
+  - [x] Test 3: `POST /api/auth/register` without `address` → Returns **HTTP 400 Bad Request** (Zod validation: address required).
+  - [x] Test 4: `POST /api/auth/register` with `phoneNumber` containing fewer than 7 digits → Returns **HTTP 400 Bad Request**.
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Backend:**
-  - [ ] [Schema] Add to `Profile` model in `prisma/schema.prisma`:
+- [x] **GREEN — Backend:**
+  - [x] [Schema] Add to `Profile` model in `prisma/schema.prisma`:
     ```prisma
     phoneNumber   String
     address       String
     ```
     Migration name: `20260918000000_add_kyc_and_extended_profile` (this single migration covers ALL schema changes in Phase 9 — W-901 through W-904).
-  - [ ] [Repository] Update `src/modules/identity/repository/user.repository.ts` — `createUser()` function now accepts `phoneNumber: string` and `address: string` and passes them to `profile: { create: { ..., phoneNumber, address } }`.
-  - [ ] [Service] Update `src/modules/identity/service/auth.service.ts` — `register()` method destructures and passes `phoneNumber` and `address` to repository.
-  - [ ] [Controller] Update `src/app/api/auth/register/route.ts` — Zod schema adds:
+  - [x] [Repository] Update `src/modules/identity/repository/user.repository.ts` — `createUser()` function now accepts `phoneNumber: string` and `address: string` and passes them to `profile: { create: { ..., phoneNumber, address } }`.
+  - [x] [Service] Update `src/modules/identity/service/auth.service.ts` — `register()` method destructures and passes `phoneNumber` and `address` to repository.
+  - [x] [Controller] Update `src/app/api/auth/register/route.ts` — Zod schema adds:
     ```typescript
     phoneNumber: z.string().min(7, "Phone number must be at least 7 characters").max(20),
     address: z.string().min(10, "Address must be at least 10 characters").max(500),
     ```
-  - [ ] [Types] Create/update `src/types/user.ts` — Add `RegisterRequest` DTO with `phoneNumber` and `address` fields. Add `UserProfileDto` with all profile fields.
-  - [ ] Run integration test — **confirm GREEN.**
+  - [x] [Types] Create/update `src/types/user.ts` — Add `RegisterRequest` DTO with `phoneNumber` and `address` fields. Add `UserProfileDto` with all profile fields.
+  - [x] Run integration test — **confirm GREEN.**
 
-- [ ] **RED — Unit (`src/tests/unit/extended-registration.test.ts`):**
-  - [ ] Test: Zod schema rejects `phoneNumber` with fewer than 7 chars.
-  - [ ] Test: Zod schema rejects `address` with fewer than 10 chars.
-  - [ ] Test: Zod schema accepts `phoneNumber: "+92-333-1234567"` (international format).
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Unit (`src/tests/unit/extended-registration.test.ts`):**
+  - [x] Test: Zod schema rejects `phoneNumber` with fewer than 7 chars.
+  - [x] Test: Zod schema rejects `address` with fewer than 10 chars.
+  - [x] Test: Zod schema accepts `phoneNumber: "+92-333-1234567"` (international format).
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Frontend:**
-  - [ ] [Component] Update `src/app/(auth)/register/page.tsx`:
+- [x] **GREEN — Frontend:**
+  - [x] [Component] Update `src/app/(auth)/register/page.tsx`:
     - Add `phoneNumber` state and input field (type="tel", icon: `Phone` from lucide-react, placeholder: "+1 (555) 867-5309").
     - Add `address` state and `<textarea>` field (icon: `MapPin` from lucide-react, placeholder: "123 Main Street, City, State, ZIP").
     - Both fields marked `required`.
     - Submit handler passes `phoneNumber` and `address` in the fetch body.
-  - [ ] Run unit test — **confirm GREEN.**
+  - [x] Run unit test — **confirm GREEN.**
 
-- [ ] **Verification chain:**
-  - [ ] Navigate to `http://127.0.0.1:3847/register` → Page renders 5 fields: Full Name, Email, Phone, Address, Password → ✅
-  - [ ] Fill all fields including phone "+1-555-0199" and address "456 Chain St, Austin TX 78701" → Click "Create Account & Wallet" → Registration succeeds → Redirected to `/wallet` (or `/verify` after W-902 is implemented) → ✅
-  - [ ] In Prisma Studio / psql on `coin_caret_dev`: `SELECT phone_number, address FROM profiles WHERE user_id = '<new-user-id>'` → Returns correct values → ✅
-  - [ ] Submit without phone number → "Phone number is required" validation error shown → ✅
-  - [ ] ✅ Done.
+- [x] **Verification chain:**
+  - [x] Navigate to `http://127.0.0.1:3847/register` → Page renders 5 fields: Full Name, Email, Phone, Address, Password → ✅
+  - [x] Fill all fields including phone "+1-555-0199" and address "456 Chain St, Austin TX 78701" → Click "Create Account & Wallet" → Registration succeeds → Redirected to `/wallet` (or `/verify` after W-902 is implemented) → ✅
+  - [x] In Prisma Studio / psql on `coin_caret_dev`: `SELECT phone_number, address FROM profiles WHERE user_id = '<new-user-id>'` → Returns correct values → ✅
+  - [x] Submit without phone number → "Phone number is required" validation error shown → ✅
+  - [x] ✅ Done.
 
 ---
 
@@ -1340,26 +1340,26 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     }
     ```
 
-  - [ ] [Schema] Add to `User` model in `prisma/schema.prisma`:
+  - [x] [Schema] Add to `User` model in `prisma/schema.prisma`:
     ```prisma
     kycRequired         Boolean          @default(true)
     verification        UserVerification?
     kycReviews          UserVerification[] @relation("KycReviewedBy")
     ```
 
-  - [ ] [Service] Create `src/modules/kyc/service/document-storage.service.ts`:
+  - [x] [Service] Create `src/modules/kyc/service/document-storage.service.ts`:
     - Implements `IDocumentStorage` interface: `save(fileName, buffer, mimeType, verificationId): Promise<KycDocument>` and `retrieve(kycDocumentId): Promise<Buffer>`.
     - In `postgres` mode: base64-encodes buffer, creates `KycDocument` row with `base64Data` set, `storageBackend = "postgres"`, `storageRef = kycDocument.id`.
     - `retrieve()` reads `base64Data`, decodes Buffer, returns it.
     - **Key rule:** The interface is the only thing the KYC service calls. Swapping to R2 in future only requires replacing the implementation body — zero changes elsewhere.
 
-  - [ ] [Service] Create `src/modules/kyc/service/kyc-encryption.service.ts`:
+  - [x] [Service] Create `src/modules/kyc/service/kyc-encryption.service.ts`:
     - `encryptSsn(plainSsn: string): { encrypted: string, iv: string, authTag: string }` — uses Node.js `crypto.createCipheriv("aes-256-gcm", KEY, iv)`.
     - `decryptSsn(encrypted: string, iv: string, authTag: string): string` — reverse operation.
     - Key is read from `process.env.KYC_ENCRYPTION_KEY` (32-byte hex). Throws `MissingEncryptionKeyError` if not set.
     - **Critical rule:** NEVER log, return in API response, or expose plaintext SSN after encryption completes.
 
-  - [ ] [Service] Create `src/modules/kyc/service/kyc.service.ts`:
+  - [x] [Service] Create `src/modules/kyc/service/kyc.service.ts`:
     - `submitVerification({ userId, ssnPlaintext, documents: { ssnCard, federalId, drivingLicense } })`:
       1. Checks if `UserVerification` already exists for `userId` → throws `AlreadySubmittedError` (409).
       2. Encrypts SSN via `kycEncryptionService.encryptSsn()`.
@@ -1374,13 +1374,13 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     - `rejectVerification({ verificationId, reviewerUserId, notes })` — admin action.
     - `getVerificationStatus(userId)` → Returns `KycVerificationStatus`.
 
-  - [ ] [Repository] Create `src/modules/kyc/repository/kyc.repository.ts`:
+  - [x] [Repository] Create `src/modules/kyc/repository/kyc.repository.ts`:
     - `findByUserId(userId)`: Finds `UserVerification` with documents included.
     - `createVerification(data)`: Prisma create.
     - `updateVerificationStatus(id, status, reviewData?)`: Updates status + reviewer fields.
     - `findAllWithUsers(pagination)`: For admin users list page — finds all verifications with user data.
 
-  - [ ] [Controller] Create `src/app/api/kyc/submit/route.ts`:
+  - [x] [Controller] Create `src/app/api/kyc/submit/route.ts`:
     - `POST` — authenticated session required.
     - Parses `multipart/form-data` using the Next.js `request.formData()` API.
     - Extracts: `ssn` (string field), `ssnCard` (File), `federalId` (File), `drivingLicense` (File).
@@ -1388,11 +1388,11 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     - Calls `kycService.submitVerification()`.
     - Returns HTTP 201 with `{ verificationId, status }`.
 
-  - [ ] [Controller] Create `src/app/api/kyc/status/route.ts`:
+  - [x] [Controller] Create `src/app/api/kyc/status/route.ts`:
     - `GET` — authenticated session required.
     - Returns `{ status: KycVerificationStatus, reviewNotes?: string }` for the current user.
 
-  - [ ] Update `next.config.mjs` to allow larger API body for KYC route:
+  - [x] Update `next.config.mjs` to allow larger API body for KYC route:
     ```javascript
     // next.config.mjs — add api body size config
     // Note: Next.js App Router uses Request API, not legacy bodyParser.
@@ -1400,7 +1400,7 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     ```
     > **Note:** In Next.js App Router (v14+), the legacy `api.bodyParser` config does not apply. File size must be validated in the route handler by checking `file.size` on each `File` object from `formData()`. No `next.config.mjs` change is needed for this.
 
-  - [ ] [Types] Update `src/types/user.ts` — add:
+  - [x] [Types] Update `src/types/user.ts` — add:
     ```typescript
     export type KycVerificationStatus = "NOT_SUBMITTED" | "SUBMITTED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
     export type KycDocumentType = "SSN_CARD" | "FEDERAL_ID" | "DRIVING_LICENSE";
@@ -1410,18 +1410,18 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     export interface UserVerificationDto { id: string; userId: string; status: KycVerificationStatus; reviewNotes?: string | null; documents: KycDocumentDto[]; submittedAt?: string | null; reviewedAt?: string | null; }
     ```
 
-  - [ ] Run integration test — **confirm GREEN.**
+  - [x] Run integration test — **confirm GREEN.**
 
-- [ ] **RED — Unit (`src/tests/unit/kyc-encryption.test.ts`):**
-  - [ ] Test: `encryptSsn("123-45-6789")` → Returns `{ encrypted, iv, authTag }` where `encrypted !== "123-45-6789"`.
-  - [ ] Test: `decryptSsn(encrypted, iv, authTag)` → Returns `"123-45-6789"` exactly (round-trip).
-  - [ ] Test: `encryptSsn("123-45-6789")` called twice produces different `iv` values (non-deterministic IV — prevents rainbow table attacks).
-  - [ ] Test: `decryptSsn` with a tampered `authTag` → throws `DecryptionError` (GCM authentication failure).
-  - [ ] Test: `encryptSsn` with `KYC_ENCRYPTION_KEY` unset → throws `MissingEncryptionKeyError`.
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Unit (`src/tests/unit/kyc-encryption.test.ts`):**
+  - [x] Test: `encryptSsn("123-45-6789")` → Returns `{ encrypted, iv, authTag }` where `encrypted !== "123-45-6789"`.
+  - [x] Test: `decryptSsn(encrypted, iv, authTag)` → Returns `"123-45-6789"` exactly (round-trip).
+  - [x] Test: `encryptSsn("123-45-6789")` called twice produces different `iv` values (non-deterministic IV — prevents rainbow table attacks).
+  - [x] Test: `decryptSsn` with a tampered `authTag` → throws `DecryptionError` (GCM authentication failure).
+  - [x] Test: `encryptSsn` with `KYC_ENCRYPTION_KEY` unset → throws `MissingEncryptionKeyError`.
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Frontend:**
-  - [ ] [Page] Create `src/app/(wallet)/verify/page.tsx` — KYC verification upload page:
+- [x] **GREEN — Frontend:**
+  - [x] [Page] Create `src/app/(wallet)/verify/page.tsx` — KYC verification upload page:
     - Session-guarded (redirect to `/login` if not authenticated).
     - If user is already `APPROVED`, redirect to `/wallet`.
     - If user is `PENDING_REVIEW`, show a "Documents Under Review" holding screen with animated clock icon.
@@ -1436,22 +1436,22 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     - On success: shows either "Verification Approved" (auto mode) or "Documents Submitted — Pending Review" (manual mode).
     - Visual styling: premium dark card layout matching existing auth pages, amber/yellow accent color for verification theme (distinct from wallet's emerald).
 
-  - [ ] [Component] Create `src/components/kyc/DocumentUploadZone.tsx`:
+  - [x] [Component] Create `src/components/kyc/DocumentUploadZone.tsx`:
     - Props: `label: string`, `documentType: KycDocumentType`, `onFileSelected: (file: File) => void`, `selectedFile: File | null`.
     - Shows upload icon + dashed border when empty; shows file name + size + green checkmark when file selected.
     - Accepts: `accept="image/jpeg,image/png,application/pdf"`.
     - Client-side validation: file.size > 10 * 1024 * 1024 → shows inline error "File exceeds 10 MB limit".
 
-  - [ ] Run unit test — **confirm GREEN.**
+  - [x] Run unit test — **confirm GREEN.**
 
-- [ ] **Verification chain:**
-  - [ ] Register new user → Redirected to `/verify` (after W-903 gate is in place; for now navigate manually) → Page renders 4 upload sections → ✅
-  - [ ] Fill SSN "987-65-4321", attach 3 valid JPG files → Click Submit → HTTP 201 response → ✅
-  - [ ] `KYC_REVIEW_MODE = "automatic"`: Status shows "Verification Approved" immediately → ✅
-  - [ ] `KYC_REVIEW_MODE = "manual"`: Status shows "Pending Review" → ✅
-  - [ ] Check DB: `SELECT ssn_encrypted FROM user_verifications` → Value is NOT "987-65-4321" (encrypted) → ✅
-  - [ ] Check DB: `SELECT COUNT(*) FROM kyc_documents WHERE user_verification_id = '<id>'` → Returns 3 → ✅
-  - [ ] ✅ Done.
+- [x] **Verification chain:**
+  - [x] Register new user → Redirected to `/verify` (after W-903 gate is in place; for now navigate manually) → Page renders 4 upload sections → ✅
+  - [x] Fill SSN "987-65-4321", attach 3 valid JPG files → Click Submit → HTTP 201 response → ✅
+  - [x] `KYC_REVIEW_MODE = "automatic"`: Status shows "Verification Approved" immediately → ✅
+  - [x] `KYC_REVIEW_MODE = "manual"`: Status shows "Pending Review" → ✅
+  - [x] Check DB: `SELECT ssn_encrypted FROM user_verifications` → Value is NOT "987-65-4321" (encrypted) → ✅
+  - [x] Check DB: `SELECT COUNT(*) FROM kyc_documents WHERE user_verification_id = '<id>'` → Returns 3 → ✅
+  - [x] ✅ Done.
 
 ---
 
@@ -1465,19 +1465,19 @@ This key must **never** be committed to source control. It is listed in `.env.ex
 
 ---
 
-- [ ] **RED — Integration (`src/tests/integration/kyc-gate.integration.test.ts`):**
-  - [ ] Test 1: `KYC_REQUIRED = "false"` → `kycGateService.getAccessStatus(userId)` returns `"FULL_ACCESS"` regardless of `UserVerification` status.
-  - [ ] Test 2: `KYC_REQUIRED = "true"`, user has no `UserVerification` row → Returns `"NEEDS_UPLOAD"`.
-  - [ ] Test 3: `KYC_REQUIRED = "true"`, `KYC_REVIEW_MODE = "manual"`, user status = `PENDING_REVIEW` → Returns `"AWAITING_REVIEW"`.
-  - [ ] Test 4: `KYC_REQUIRED = "true"`, user status = `APPROVED` → Returns `"FULL_ACCESS"`.
-  - [ ] Test 5: `KYC_REQUIRED = "true"`, user status = `REJECTED` → Returns `"REJECTED_REUPLOAD"`.
-  - [ ] Test 6: `KYC_REQUIRED = "true"`, per-user `kycRequired = false` (override) → Returns `"FULL_ACCESS"` regardless of platform mode.
-  - [ ] Test 7: `PATCH /api/admin/config` with `{ key: "KYC_REQUIRED", value: "true" }` as Platform Owner → HTTP 200. As regular USER → HTTP 403.
-  - [ ] Test 8: `PATCH /api/admin/config` with `{ key: "KYC_REVIEW_MODE", value: "invalid_value" }` → HTTP 400 Bad Request (only `"automatic"` or `"manual"` accepted).
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Integration (`src/tests/integration/kyc-gate.integration.test.ts`):**
+  - [x] Test 1: `KYC_REQUIRED = "false"` → `kycGateService.getAccessStatus(userId)` returns `"FULL_ACCESS"` regardless of `UserVerification` status.
+  - [x] Test 2: `KYC_REQUIRED = "true"`, user has no `UserVerification` row → Returns `"NEEDS_UPLOAD"`.
+  - [x] Test 3: `KYC_REQUIRED = "true"`, `KYC_REVIEW_MODE = "manual"`, user status = `PENDING_REVIEW` → Returns `"AWAITING_REVIEW"`.
+  - [x] Test 4: `KYC_REQUIRED = "true"`, user status = `APPROVED` → Returns `"FULL_ACCESS"`.
+  - [x] Test 5: `KYC_REQUIRED = "true"`, user status = `REJECTED` → Returns `"REJECTED_REUPLOAD"`.
+  - [x] Test 6: `KYC_REQUIRED = "true"`, per-user `kycRequired = false` (override) → Returns `"FULL_ACCESS"` regardless of platform mode.
+  - [x] Test 7: `PATCH /api/admin/config` with `{ key: "KYC_REQUIRED", value: "true" }` as Platform Owner → HTTP 200. As regular USER → HTTP 403.
+  - [x] Test 8: `PATCH /api/admin/config` with `{ key: "KYC_REVIEW_MODE", value: "invalid_value" }` → HTTP 400 Bad Request (only `"automatic"` or `"manual"` accepted).
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Backend:**
-  - [ ] [Service] Create `src/modules/kyc/service/kyc-gate.service.ts`:
+- [x] **GREEN — Backend:**
+  - [x] [Service] Create `src/modules/kyc/service/kyc-gate.service.ts`:
     - `getAccessStatus(userId: string): Promise<KycAccessStatus>`:
       1. Fetch `KYC_REQUIRED` from `PlatformConfig` — if `"false"`, return `"FULL_ACCESS"`.
       2. Fetch user's `kycRequired` boolean from DB — if `false`, return `"FULL_ACCESS"`.
@@ -1488,54 +1488,54 @@ This key must **never** be committed to source control. It is listed in `.env.ex
       7. If `status === "APPROVED"`, return `"FULL_ACCESS"`.
     - Export type: `type KycAccessStatus = "FULL_ACCESS" | "NEEDS_UPLOAD" | "AWAITING_REVIEW" | "REJECTED_REUPLOAD"`
 
-  - [ ] [Controller] Update `src/app/api/admin/config/route.ts` — Add validation in `PATCH` handler:
+  - [x] [Controller] Update `src/app/api/admin/config/route.ts` — Add validation in `PATCH` handler:
     - When `key === "KYC_REVIEW_MODE"`, validate value must be `"automatic"` or `"manual"` only — else return HTTP 400.
     - When `key === "KYC_REQUIRED"`, validate value must be `"true"` or `"false"` only — else return HTTP 400.
 
-  - [ ] [Controller] Create `src/app/api/kyc/gate/route.ts`:
+  - [x] [Controller] Create `src/app/api/kyc/gate/route.ts`:
     - `GET` — authenticated session required.
     - Calls `kycGateService.getAccessStatus(session.userId)`.
     - Returns `{ accessStatus: KycAccessStatus }`.
     - Used by wallet layout client-side to determine redirect behavior.
 
-  - [ ] [Layout] Update `src/app/(wallet)/layout.tsx`:
+  - [x] [Layout] Update `src/app/(wallet)/layout.tsx`:
     - Server component: fetch `GET /api/kyc/gate` (or call `kycGateService` directly since it's a server component).
     - If `accessStatus === "NEEDS_UPLOAD"` → `redirect("/verify")`.
     - If `accessStatus === "AWAITING_REVIEW"` → render a full-screen overlay (not a redirect) showing "Your documents are under review. You'll have full access once approved."
     - If `accessStatus === "REJECTED_REUPLOAD"` → `redirect("/verify?reason=rejected")`.
     - If `accessStatus === "FULL_ACCESS"` → render children normally.
 
-  - [ ] [Types] Update `src/types/user.ts` — add `KycAccessStatus` type.
+  - [x] [Types] Update `src/types/user.ts` — add `KycAccessStatus` type.
 
-  - [ ] Run integration test — **confirm GREEN.**
+  - [x] Run integration test — **confirm GREEN.**
 
-- [ ] **RED — Unit (`src/tests/unit/kyc-gate.test.ts`):**
-  - [ ] Test: `getAccessStatus` with mocked `KYC_REQUIRED = "false"` returns `"FULL_ACCESS"` without querying `UserVerification`.
-  - [ ] Test: `getAccessStatus` with mocked user `kycRequired = false` returns `"FULL_ACCESS"`.
-  - [ ] Test: Status state machine covers all 5 enum values correctly.
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Unit (`src/tests/unit/kyc-gate.test.ts`):**
+  - [x] Test: `getAccessStatus` with mocked `KYC_REQUIRED = "false"` returns `"FULL_ACCESS"` without querying `UserVerification`.
+  - [x] Test: `getAccessStatus` with mocked user `kycRequired = false` returns `"FULL_ACCESS"`.
+  - [x] Test: Status state machine covers all 5 enum values correctly.
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Frontend:**
-  - [ ] [Page] Update `src/app/(admin)/admin/settings/page.tsx`:
+- [x] **GREEN — Frontend:**
+  - [x] [Page] Update `src/app/(admin)/admin/settings/page.tsx`:
     - Add two new toggle sections below the existing CC/USD Rate form:
       1. **KYC Required (Platform-Wide):** Toggle switch — OFF = no KYC needed, ON = KYC enforced. Calls `PATCH /api/admin/config` with `{ key: "KYC_REQUIRED", value: "true"/"false" }`.
       2. **KYC Review Mode:** Toggle switch — OFF = Automatic (instant approval), ON = Manual (admin review required). Calls `PATCH /api/admin/config` with `{ key: "KYC_REVIEW_MODE", value: "automatic"/"manual" }`.
     - Both toggles show current DB state on load.
     - Show success toast on save.
 
-  - [ ] [Component] Create `src/components/admin/KycConfigPanel.tsx`:
+  - [x] [Component] Create `src/components/admin/KycConfigPanel.tsx`:
     - Renders both toggles with descriptive labels, subtext, and visual state indicators.
     - Used in the admin settings page.
 
-  - [ ] Run unit test — **confirm GREEN.**
+  - [x] Run unit test — **confirm GREEN.**
 
-- [ ] **Verification chain:**
-  - [ ] Log in as admin → `/admin/settings` → KYC section shows two toggles → ✅
-  - [ ] Toggle `KYC_REQUIRED` to ON → Save → DB row updated → ✅
-  - [ ] Log in as new user (no KYC) → Navigate to `/wallet` → Redirected to `/verify` → ✅
-  - [ ] Toggle `KYC_REQUIRED` to OFF → Log in as same user → `/wallet` loads normally → ✅
-  - [ ] Set `KYC_REVIEW_MODE` to Manual → User uploads docs → Status stays `PENDING_REVIEW` → Wallet shows "under review" overlay → ✅
-  - [ ] ✅ Done.
+- [x] **Verification chain:**
+  - [x] Log in as admin → `/admin/settings` → KYC section shows two toggles → ✅
+  - [x] Toggle `KYC_REQUIRED` to ON → Save → DB row updated → ✅
+  - [x] Log in as new user (no KYC) → Navigate to `/wallet` → Redirected to `/verify` → ✅
+  - [x] Toggle `KYC_REQUIRED` to OFF → Log in as same user → `/wallet` loads normally → ✅
+  - [x] Set `KYC_REVIEW_MODE` to Manual → User uploads docs → Status stays `PENDING_REVIEW` → Wallet shows "under review" overlay → ✅
+  - [x] ✅ Done.
 
 ---
 

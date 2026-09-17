@@ -4,13 +4,15 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowRight, Lock, Mail, User as UserIcon, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Lock, Mail, User as UserIcon, AlertCircle, Loader2, CheckCircle2, Phone, MapPin } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,7 +27,7 @@ export default function RegisterPage() {
       const registerRes = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, email, password }),
+        body: JSON.stringify({ displayName, email, phoneNumber, address, password }),
       });
 
       const registerData = await registerRes.json();
@@ -115,6 +117,40 @@ export default function RegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="jane@institution.com"
                   className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Phone Number
+              </label>
+              <div className="relative">
+                <Phone className="w-5 h-5 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="tel"
+                  required
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="+1 (555) 867-5309"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Physical Address
+              </label>
+              <div className="relative">
+                <MapPin className="w-5 h-5 text-slate-500 absolute left-3.5 top-3.5" />
+                <textarea
+                  required
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="123 Main Street, City, State, ZIP"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors resize-none"
                 />
               </div>
             </div>

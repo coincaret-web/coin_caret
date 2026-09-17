@@ -35,7 +35,10 @@ export async function createUserWithRole(data: {
   email: string;
   passwordHash: string;
   displayName: string;
+  phoneNumber?: string;
+  address?: string;
   roleName?: RoleName;
+  kycRequired?: boolean;
 }) {
   const roleName = data.roleName ?? RoleName.USER;
 
@@ -58,10 +61,13 @@ export async function createUserWithRole(data: {
       email: data.email.toLowerCase().trim(),
       passwordHash: data.passwordHash,
       displayName: data.displayName,
+      kycRequired: data.kycRequired ?? true,
       profile: {
         create: {
           themePreference: "dark",
           currencyDisplay: "USD",
+          phoneNumber: data.phoneNumber || "+1-555-000-0000",
+          address: data.address || "1 Sovereign Plaza, Financial District",
         },
       },
       roles: {

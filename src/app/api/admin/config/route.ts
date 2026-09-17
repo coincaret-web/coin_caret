@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/checkPermission";
-import { getAllConfigs, setCcUsdRate } from "@/modules/admin/service/platform-config.service";
+import { getAllConfigs, setGenericPlatformConfig } from "@/modules/admin/service/platform-config.service";
 
 async function resolveUserRole(req: NextRequest): Promise<{ userId: string | null; role: string }> {
   const headerUserId = req.headers.get("x-user-id");
@@ -70,15 +70,8 @@ export async function PATCH(req: NextRequest) {
 
     const clientIp = req.headers.get("x-forwarded-for") || "127.0.0.1";
 
-    if (key === "CC_USD_RATE") {
-      const updated = await setCcUsdRate(value, userId, clientIp);
-      return NextResponse.json({ success: true, config: updated }, { status: 200 });
-    }
-
-    return NextResponse.json(
-      { error: `Unknown configuration key: ${key}` },
-      { status: 400 }
-    );
+    const updated = await setGenericPlatformConfig(key, value, userId, clientIp);
+    return NextResponse.json({ success: true, config: updated }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Failed to update platform configuration." },

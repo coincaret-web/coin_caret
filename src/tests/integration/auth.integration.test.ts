@@ -22,6 +22,8 @@ describe("Live Identity, Auth & RBAC Database Integration (W-102)", () => {
       email: testEmail,
       password: "StrongPassword123!",
       displayName: "Alice Nakamoto",
+      phoneNumber: "+1-555-010-0001",
+      address: "123 Nakamoto Way, Austin, TX",
     });
 
     expect(result.user).toBeDefined();
@@ -41,6 +43,8 @@ describe("Live Identity, Auth & RBAC Database Integration (W-102)", () => {
     expect(dbUser).not.toBeNull();
     expect(dbUser?.displayName).toBe("Alice Nakamoto");
     expect(dbUser?.profile?.themePreference).toBe("dark");
+    expect(dbUser?.profile?.phoneNumber).toBe("+1-555-010-0001");
+    expect(dbUser?.profile?.address).toBe("123 Nakamoto Way, Austin, TX");
 
     // Verify bcrypt password hash in DB
     const isPasswordValid = await verifyPassword("StrongPassword123!", dbUser!.passwordHash);
@@ -60,6 +64,8 @@ describe("Live Identity, Auth & RBAC Database Integration (W-102)", () => {
         email: testEmail,
         password: "AnotherPassword123!",
         displayName: "Duplicate User",
+        phoneNumber: "+1-555-010-0002",
+        address: "456 Satoshi Blvd, Austin, TX",
       })
     ).rejects.toThrow("already exists");
   });

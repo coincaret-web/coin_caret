@@ -86,6 +86,58 @@ export async function setCcUsdRate(
   return updated;
 }
 
+export async function setGenericPlatformConfig(
+  key: string,
+  value: string,
+  actorUserId?: string,
+  ipAddress?: string
+) {
+  if (key === "KYC_REQUIRED") {
+    if (value !== "true" && value !== "false") {
+      throw new Error("Value for KYC_REQUIRED must be 'true' or 'false'.");
+    }
+  } else if (key === "KYC_REVIEW_MODE") {
+    if (value !== "automatic" && value !== "manual") {
+      throw new Error("Value for KYC_REVIEW_MODE must be 'automatic' or 'manual'.");
+    }
+  } else if (key === "CC_USD_RATE") {
+    return setCcUsdRate(value, actorUserId, ipAddress);
+  } else {
+    throw new Error(`Unknown configuration key: ${key}`);
+  }
+
+  const beforeConfig = await findPlatformConfigByKey(key);
+
+  const updated = await upsertPlatformConfig(
+    key,
+    value,
+    actorUserId,
+    key === "KYC_REQUIRED"
+      ? "Enforce KYC identity verification platform-wide"
+      : "KYC verification mode (automatic or manual review)"
+  );
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: actorUserId || null,
+      action: "UPDATE_PLATFORM_CONFIG",
+      entityType: "PLATFORM_CONFIG",
+      entityId: key,
+      beforeState: {
+        key,
+        value: beforeConfig?.value || null,
+      },
+      afterState: {
+        key,
+        value,
+      },
+      ipAddress: ipAddress || null,
+    },
+  });
+
+  return updated;
+}
+
 export async function getAllConfigs() {
   return findAllPlatformConfigs();
 }

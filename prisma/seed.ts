@@ -119,7 +119,15 @@ async function main() {
         email: adminEmail,
         passwordHash: adminPassHash,
         displayName: "Sovereign Treasury Officer",
-        profile: { create: { themePreference: "dark", currencyDisplay: "USD" } },
+        kycRequired: false,
+        profile: {
+          create: {
+            themePreference: "dark",
+            currencyDisplay: "USD",
+            phoneNumber: "+1-555-000-0001",
+            address: "1 Sovereign Treasury Plaza, New York, NY 10001",
+          },
+        },
         roles: { create: { roleId: adminRole!.id } },
       },
     });
@@ -140,7 +148,15 @@ async function main() {
         email: demoEmail,
         passwordHash: demoPassHash,
         displayName: "Apex Digital Capital",
-        profile: { create: { themePreference: "dark", currencyDisplay: "USD" } },
+        kycRequired: false,
+        profile: {
+          create: {
+            themePreference: "dark",
+            currencyDisplay: "USD",
+            phoneNumber: "+1-555-000-0002",
+            address: "456 Apex Capital Tower, Austin, TX 78701",
+          },
+        },
         roles: { create: { roleId: userRole!.id } },
       },
     });
@@ -245,7 +261,7 @@ async function main() {
     }
   }
 
-  // ── 7. CC/USD Platform Config default ──────────────────────────────────────
+  // ── 9. Platform Configuration Seed ────────────────────────────────────────
   await prisma.platformConfig.upsert({
     where: { key: "CC_USD_RATE" },
     update: {},
@@ -257,12 +273,38 @@ async function main() {
   });
   console.log("✅ CC/USD rate platform config ensured.");
 
+  // KYC_REQUIRED — default: false (platform starts with KYC disabled)
+  await prisma.platformConfig.upsert({
+    where: { key: "KYC_REQUIRED" },
+    update: {},
+    create: {
+      key: "KYC_REQUIRED",
+      value: "false",
+      description: "Platform-wide KYC enforcement toggle. true = KYC required, false = all users bypass KYC.",
+    },
+  });
+
+  // KYC_REVIEW_MODE — default: automatic (uploaded docs are instantly approved)
+  await prisma.platformConfig.upsert({
+    where: { key: "KYC_REVIEW_MODE" },
+    update: {},
+    create: {
+      key: "KYC_REVIEW_MODE",
+      value: "automatic",
+      description: "KYC document review mode. automatic = instant approval on upload, manual = admin must review and approve.",
+    },
+  });
+  console.log("✅ KYC platform config keys ensured.");
+
   console.log("");
   console.log("✅ Coin Caret Database Seeding Completed Successfully.");
   console.log("-------------------------------------------------------");
   console.log("Demo Credentials:");
   console.log("  User:  user@coincaret.com  / Password123!");
   console.log("  Admin: admin@coincaret.com / AdminPassword123!");
+  console.log("  KYC Status: EXEMPT (kycRequired = false for demo accounts)");
+  console.log("  KYC_REQUIRED: false (platform default — toggle in /admin/settings)");
+  console.log("  KYC_REVIEW_MODE: automatic (platform default — toggle in /admin/settings)");
   console.log("-------------------------------------------------------");
   console.log("Demo Portfolio (user@coincaret.com):");
   console.log("  CC:   5,000.00000000");
