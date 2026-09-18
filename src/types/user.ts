@@ -1,3 +1,4 @@
+export { KycVerificationStatus, KycDocumentType, RoleName, UserStatus } from "@prisma/client";
 import { KycVerificationStatus, KycDocumentType, RoleName, UserStatus } from "@prisma/client";
 import { z } from "zod";
 

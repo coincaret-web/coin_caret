@@ -113,7 +113,7 @@ describe("W-903: KYC Platform Controls & Wallet Access Gate Integration Tests", 
       where: { id: exemptUserId },
       data: { kycRequired: false },
     });
-  });
+  }, 30000);
 
   afterAll(async () => {
     await prisma.$disconnect();

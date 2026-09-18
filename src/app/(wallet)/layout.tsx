@@ -18,22 +18,17 @@ export default async function WalletLayout({ children }: { children: React.React
   }
 
   const userId = (session.user as any).id;
-  const headersList = await headers();
-  const pathname = headersList.get("x-pathname") || "";
-  const isVerifyPage = pathname.startsWith("/verify");
-
   const accessStatus = await kycGateService.getAccessStatus(userId);
 
-  if (!isVerifyPage) {
-    if (accessStatus === "NEEDS_UPLOAD") {
-      redirect("/verify");
-    }
+  if (accessStatus === "NEEDS_UPLOAD") {
+    redirect("/verify");
+  }
 
-    if (accessStatus === "REJECTED_REUPLOAD") {
-      redirect("/verify?reason=rejected");
-    }
+  if (accessStatus === "REJECTED_REUPLOAD") {
+    redirect("/verify?reason=rejected");
+  }
 
-    if (accessStatus === "AWAITING_REVIEW") {
+  if (accessStatus === "AWAITING_REVIEW") {
       return (
         <div className="min-h-screen bg-[#0B0F17] flex flex-col justify-between text-slate-100 selection:bg-emerald-500 selection:text-slate-950">
           <WalletNavbar primaryAddress="" />
@@ -93,7 +88,6 @@ export default async function WalletLayout({ children }: { children: React.React
         </div>
       );
     }
-  }
 
   const userWallet = await prisma.wallet.findFirst({
     where: { userId },

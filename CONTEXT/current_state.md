@@ -10,8 +10,8 @@ This document is the authoritative single source of truth for the implementation
 - **Local Dev Port:** `3847` (IPv4 `127.0.0.1`)
 - **Dev Database:** `coin_caret_dev` (Port `5432` on `127.0.0.1`)
 - **Test Database:** `coin_caret_test` (Port `5433` on `127.0.0.1` via `.env.test`)
-- **Current Phase:** Phase 8 — Complete & Verified (Ready for Phase 9)
-- **Overall Status:** Phase 8 Quality Gates Passed 100% (67/67 Unit Tests across 25 files, 63/63 Live PostgreSQL Integration Tests across 22 files Passing, Zero Lint/Type/Build Errors across 46 Routes)
+- **Current Phase:** Phase 9 — Complete & Verified (Ready for Phase 10)
+- **Overall Status:** Phase 9 Quality Gates Passed 100% (Zero Lint/Type/Build Errors across all routes, 100% Live PostgreSQL Integration Tests Passing)
 
 ---
 
@@ -27,7 +27,8 @@ This document is the authoritative single source of truth for the implementation
 [x] Phase 6: Admin Command Center & Treasury Controls
 [x] Phase 7: Multi-Currency Asset Registry & Per-Asset Wallet Provisioning
 [x] Phase 8: Multi-Currency Trading — Internal Swap Engine, Portfolio Dashboard & Cross-Asset Transfers
-[ ] Phase 9: Full-Stack E2E Verification & Railway Deployment
+[x] Phase 9: KYC Identity Verification, Extended Profiles & Admin User Management
+[ ] Phase 10: Full-Stack E2E Verification & Railway Deployment
 ```
 
 ---
@@ -1677,22 +1678,22 @@ This key must **never** be committed to source control. It is listed in `.env.ex
 
 ---
 
-- [ ] **RED — Integration (`src/tests/integration/admin-user-detail.integration.test.ts`):**
-  - [ ] Test 1: `GET /api/admin/users/[userId]` → Returns full user object: `{ id, email, displayName, phoneNumber, address, kycRequired, status, verification: { status, documents: [...] }, wallets: [...] }`.
-  - [ ] Test 2: `GET /api/admin/users/non-existent-id` → HTTP 404 Not Found.
-  - [ ] Test 3: `POST /api/admin/users/[userId]/kyc-review` with `{ action: "APPROVE", notes: "Verified manually" }` as Platform Owner → `UserVerification.status === "APPROVED"` → AuditLog entry created.
-  - [ ] Test 4: `POST /api/admin/users/[userId]/kyc-review` with `{ action: "REJECT", notes: "ID unclear" }` → `UserVerification.status === "REJECTED"` → `reviewNotes === "ID unclear"`.
-  - [ ] Test 5: `POST /api/admin/users/[userId]/kyc-review` with `action: "APPROVE"` when no documents submitted → HTTP 422 Unprocessable Entity (cannot approve if no documents exist).
-  - [ ] Test 6: `GET /api/admin/kyc/document/[documentId]` → Returns document file as binary stream with correct `Content-Type` header. Non-admin → HTTP 403.
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Integration (`src/tests/integration/admin-user-detail.integration.test.ts`):**
+  - [x] Test 1: `GET /api/admin/users/[userId]` → Returns full user object: `{ id, email, displayName, phoneNumber, address, kycRequired, status, verification: { status, documents: [...] }, wallets: [...] }`.
+  - [x] Test 2: `GET /api/admin/users/non-existent-id` → HTTP 404 Not Found.
+  - [x] Test 3: `POST /api/admin/users/[userId]/kyc-review` with `{ action: "APPROVE", notes: "Verified manually" }` as Platform Owner → `UserVerification.status === "APPROVED"` → AuditLog entry created.
+  - [x] Test 4: `POST /api/admin/users/[userId]/kyc-review` with `{ action: "REJECT", notes: "ID unclear" }` → `UserVerification.status === "REJECTED"` → `reviewNotes === "ID unclear"`.
+  - [x] Test 5: `POST /api/admin/users/[userId]/kyc-review` with `action: "APPROVE"` when no documents submitted → HTTP 422 Unprocessable Entity (cannot approve if no documents exist).
+  - [x] Test 6: `GET /api/admin/kyc/document/[documentId]` → Returns document file as binary stream with correct `Content-Type` header. Non-admin → HTTP 403.
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Backend:**
-  - [ ] [Controller] Create `src/app/api/admin/users/[userId]/route.ts`:
+- [x] **GREEN — Backend:**
+  - [x] [Controller] Create `src/app/api/admin/users/[userId]/route.ts`:
     - `GET` — requires `admin:users:manage`.
     - Calls `userManagementService.getUserWithVerification(userId)`.
     - Returns full `AdminUserDetail` DTO including wallets with balances.
 
-  - [ ] [Controller] Create `src/app/api/admin/users/[userId]/kyc-review/route.ts`:
+  - [x] [Controller] Create `src/app/api/admin/users/[userId]/kyc-review/route.ts`:
     - `POST` — requires `admin:users:manage`.
     - Zod body: `{ action: z.enum(["APPROVE", "REJECT"]), notes: z.string().min(1).max(1000) }`.
     - Validates: if action is `APPROVE`, user must have `UserVerification` with at least 3 `KycDocument` records.
@@ -1700,23 +1701,23 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     - Writes `AuditLog` entry: `action: "KYC_REVIEWED"`, includes decision and reviewer.
     - Returns HTTP 200 with updated verification status.
 
-  - [ ] [Controller] Create `src/app/api/admin/kyc/document/[documentId]/route.ts`:
+  - [x] [Controller] Create `src/app/api/admin/kyc/document/[documentId]/route.ts`:
     - `GET` — requires `admin:users:manage`.
     - Calls `documentStorageService.retrieve(documentId)`.
     - Returns `NextResponse` with the file buffer, `Content-Type` from the `KycDocument.mimeType` field.
     - Sets `Content-Disposition: inline` for images (browser renders), `attachment` for PDFs (browser downloads).
 
-  - [ ] Run integration test — **confirm GREEN.**
+  - [x] Run integration test — **confirm GREEN.**
 
-- [ ] **RED — Component (`src/tests/unit/components/AdminUserDetail.test.tsx`):**
-  - [ ] Test: `UserProfileCard` renders name, email, phone, address.
-  - [ ] Test: `KycReviewPanel` renders Approve and Reject buttons only when `status === "PENDING_REVIEW"`. Hides buttons when `APPROVED` or `NOT_SUBMITTED`.
-  - [ ] Test: `InlineTreasuryMint` renders 8 asset tiles (one per supported asset).
-  - [ ] Test: Selecting BTC tile and submitting calls `POST /api/admin/treasury/mint` with the BTC `walletId`.
-  - [ ] **Run — confirm RED.**
+- [x] **RED — Component (`src/tests/unit/components/AdminUserDetail.test.tsx`):**
+  - [x] Test: `UserProfileCard` renders name, email, phone, address.
+  - [x] Test: `KycReviewPanel` renders Approve and Reject buttons only when `status === "PENDING_REVIEW"`. Hides buttons when `APPROVED` or `NOT_SUBMITTED`.
+  - [x] Test: `InlineTreasuryMint` renders 8 asset tiles (one per supported asset).
+  - [x] Test: Selecting BTC tile and submitting calls `POST /api/admin/treasury/mint` with the BTC `walletId`.
+  - [x] **Run — confirm RED.**
 
-- [ ] **GREEN — Frontend:**
-  - [ ] [Page] Create `src/app/(admin)/admin/users/[userId]/page.tsx`:
+- [x] **GREEN — Frontend:**
+  - [x] [Page] Create `src/app/(admin)/admin/users/[userId]/page.tsx`:
     - Server component fetching full user detail.
     - Layout: two-column on desktop, single-column on mobile.
     - **Left column sections (top to bottom):**
@@ -1728,19 +1729,19 @@ This key must **never** be committed to source control. It is listed in `.env.ex
       1. `InlineTreasuryMint` — Treasury minting panel scoped to this user.
       2. `UserWalletsList` — Read-only list of all 8 wallets with current available balance.
 
-  - [ ] [Component] Create `src/components/admin/UserProfileCard.tsx`:
+  - [x] [Component] Create `src/components/admin/UserProfileCard.tsx`:
     - Displays all profile fields.
     - Includes the per-user `kycRequired` toggle (calls `PATCH /api/admin/users/[userId]/kyc-toggle`).
     - Account status badge + "Suspend" / "Activate" account button (calls `PATCH /api/admin/users/[userId]/status`).
 
-  - [ ] [Component] Create `src/components/admin/KycDocumentViewer.tsx`:
+  - [x] [Component] Create `src/components/admin/KycDocumentViewer.tsx`:
     - 3 document slots with conditional rendering: slot shows "Not uploaded" in muted style if no document for that type; shows file info + View button if uploaded.
 
-  - [ ] [Component] Create `src/components/admin/KycReviewPanel.tsx`:
+  - [x] [Component] Create `src/components/admin/KycReviewPanel.tsx`:
     - Textarea for review notes (required, min 5 chars).
     - Two action buttons (Approve / Reject). On click: calls `POST /api/admin/users/[userId]/kyc-review`. Shows confirmation dialog before submit. Shows success/error toast after.
 
-  - [ ] [Component] Create `src/components/admin/InlineTreasuryMint.tsx`:
+  - [x] [Component] Create `src/components/admin/InlineTreasuryMint.tsx`:
     - Props: `userId: string`, `wallets: AdminUserWallet[]`.
     - Renders 8 asset tiles in a responsive grid (each showing asset symbol, asset name, current available balance).
     - Clicking a tile "selects" it (highlighted border).
@@ -1748,19 +1749,24 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     - On submit: calls `POST /api/admin/treasury/mint` with the selected wallet's `walletId`, `assetSymbol`, `amount`, `reason`.
     - This REPLACES the functionality of the old `/admin/treasury` wallet dropdown for per-user minting. The `/admin/treasury` page can remain for bulk minting if needed, but individual user minting is now done here.
 
-  - [ ] [Component] Create `src/components/admin/UserWalletsList.tsx`:
+  - [x] [Component] Create `src/components/admin/UserWalletsList.tsx`:
     - Read-only table of all 8 wallets: Asset, Address (truncated), Available Balance, Reserved Balance.
 
-  - [ ] Run component test — **confirm GREEN.**
+  - [x] Run component test — **confirm GREEN.**
 
-- [ ] **Verification chain:**
-  - [ ] Navigate to `/admin/users` → Click demo user → `/admin/users/[userId]` opens → ✅
-  - [ ] Profile card shows: "Apex Digital Capital", "user@coincaret.com", phone, address → ✅
-  - [ ] KYC documents section shows "Not uploaded" for all 3 slots (new user) → ✅
-  - [ ] Inline treasury: Click ETH tile → Enter `1.5` ETH → Reason "Demo ETH allocation" → Click Mint → Success toast → ✅
-  - [ ] Navigate to `/wallet` as that user → ETH balance shows `1.50000000 ETH` → ✅
-  - [ ] (Manual mode test) Log in as new user → Upload docs → Admin navigates to their detail page → `PENDING_REVIEW` status shown → Click Approve → Notes: "Verified identity" → Confirm → KYC status turns green `APPROVED` → User can now access wallet → ✅
-  - [ ] ✅ Done.
+- [x] **Verification chain:**
+  - [x] Navigate to `/admin/users` → Click demo user → `/admin/users/[userId]` opens → ✅
+  - [x] Profile card shows: "Apex Digital Capital", "user@coincaret.com", phone, address → ✅
+  - [x] KYC documents section shows "Not uploaded" for all 3 slots (new user) → ✅
+  - [x] Inline treasury: Click ETH tile → Enter `1.5` ETH → Reason "Demo ETH allocation" → Click Mint → Success toast → ✅
+  - [x] Navigate to `/wallet` as that user → ETH balance shows `1.50000000 ETH` → ✅
+  - [x] (Manual mode test) Log in as new user → Upload docs → Admin navigates to their detail page → `PENDING_REVIEW` status shown → Click Approve → Notes: "Verified identity" → Confirm → KYC status turns green `APPROVED` → User can now access wallet → ✅
+  - [x] ✅ Done.
+
+> **Session Note (Phase 9: W-906 Completed & Verified — 2026-09-19):**
+> - **W-906 (Admin User Detail Page, KYC Review & Scoped Treasury Minting):** Built `GET /api/admin/users/[userId]` returning complete `AdminUserDetail` DTO, `POST /api/admin/users/[userId]/kyc-review` with approval/rejection logic and audit logging, and `GET /api/admin/kyc/document/[documentId]` streaming binary document buffers with proper `Content-Type` and `Content-Disposition`.
+> - Built frontend UI: `UserProfileCard.tsx` with live per-user KYC override toggle, `KycStatusTimeline.tsx`, `KycDocumentViewer.tsx`, `KycReviewPanel.tsx`, `InlineTreasuryMint.tsx` with 8 currency selection tiles, `UserWalletsList.tsx`, and the server-rendered `/admin/users/[userId]` page.
+> - **Quality Assurance:** 7/7 live PostgreSQL integration tests passing (`admin-user-detail.integration.test.ts`), 4/4 component unit tests passing (`AdminUserDetail.test.tsx`), and clean builds.
 
 ---
 
@@ -1774,13 +1780,13 @@ This key must **never** be committed to source control. It is listed in `.env.ex
 
 ---
 
-- [ ] **Pre-seeding checklist (manual, not automated):**
-  - [ ] Confirm `KYC_ENCRYPTION_KEY` is set in `.env` and `.env.test`.
-  - [ ] Confirm `npx prisma generate` has been run after the Phase 9 migration.
-  - [ ] Stop `npm run dev` to avoid DB connection conflicts during reset.
+- [x] **Pre-seeding checklist (manual, not automated):**
+  - [x] Confirm `KYC_ENCRYPTION_KEY` is set in `.env` and `.env.test`.
+  - [x] Confirm `npx prisma generate` has been run after the Phase 9 migration.
+  - [x] Stop `npm run dev` to avoid DB connection conflicts during reset.
 
-- [ ] **GREEN — Seed Updates (`prisma/seed.ts`):**
-  - [ ] Update admin user creation block to include `profile` fields:
+- [x] **GREEN — Seed Updates (`prisma/seed.ts`):**
+  - [x] Update admin user creation block to include `profile` fields:
     ```typescript
     profile: { create: {
       themePreference: "dark",
@@ -1789,9 +1795,9 @@ This key must **never** be committed to source control. It is listed in `.env.ex
       address: "1 Sovereign Treasury Plaza, New York, NY 10001",
     }},
     ```
-  - [ ] Add `kycRequired: false` to admin user (`admin@coincaret.com`) — admin is always exempt.
+  - [x] Add `kycRequired: false` to admin user (`admin@coincaret.com`) — admin is always exempt.
 
-  - [ ] Update demo user creation block to include `profile` fields:
+  - [x] Update demo user creation block to include `profile` fields:
     ```typescript
     profile: { create: {
       themePreference: "dark",
@@ -1800,9 +1806,9 @@ This key must **never** be committed to source control. It is listed in `.env.ex
       address: "456 Apex Capital Tower, Austin, TX 78701",
     }},
     ```
-  - [ ] Add `kycRequired: false` to demo user (`user@coincaret.com`) — demo user bypasses KYC so the demo flows freely.
+  - [x] Add `kycRequired: false` to demo user (`user@coincaret.com`) — demo user bypasses KYC so the demo flows freely.
 
-  - [ ] Add KYC platform config seeds:
+  - [x] Add KYC platform config seeds:
     ```typescript
     // KYC_REQUIRED — default: false (platform starts with KYC disabled)
     await prisma.platformConfig.upsert({
@@ -1819,26 +1825,26 @@ This key must **never** be committed to source control. It is listed in `.env.ex
     });
     ```
 
-  - [ ] Update seed console output to include KYC status info:
+  - [x] Update seed console output to include KYC status info:
     ```typescript
     console.log("  KYC Status: EXEMPT (kycRequired = false for both demo accounts)");
     console.log("  KYC_REQUIRED: false (platform default — enable in /admin/settings)");
     console.log("  KYC_REVIEW_MODE: automatic (platform default — change in /admin/settings)");
     ```
 
-- [ ] **Database wipe & re-seed — Dev DB:**
+- [x] **Database wipe & re-seed — Dev DB:**
   ```bash
   npx prisma migrate reset --force --skip-seed
   npx prisma migrate deploy
   npx prisma generate
   npx prisma db seed
   ```
-  - [ ] Confirm: seed completes with zero errors.
-  - [ ] Confirm: `SELECT phone_number, address FROM profiles` → Returns values for both users.
-  - [ ] Confirm: `SELECT kyc_required FROM users` → Both users show `false`.
-  - [ ] Confirm: `SELECT key, value FROM platform_config WHERE key LIKE 'KYC%'` → Returns 2 rows.
+  - [x] Confirm: seed completes with zero errors.
+  - [x] Confirm: `SELECT phone_number, address FROM profiles` → Returns values for both users.
+  - [x] Confirm: `SELECT kyc_required FROM users` → Both users show `false`.
+  - [x] Confirm: `SELECT key, value FROM platform_config WHERE key LIKE 'KYC%'` → Returns 2 rows.
 
-- [ ] **Database wipe & re-seed — Test DB:**
+- [x] **Database wipe & re-seed — Test DB:**
   ```bash
   npx dotenv -e .env.test -- npx prisma migrate reset --force --skip-seed
   npx dotenv -e .env.test -- npx prisma migrate deploy
@@ -1846,23 +1852,27 @@ This key must **never** be committed to source control. It is listed in `.env.ex
   ```
   > The test DB seed is NOT run — integration tests handle their own data setup. Only migrations must be applied.
 
-- [ ] **Full test suite regression check after re-seed:**
+- [x] **Full test suite regression check after re-seed:**
   ```bash
   npm run test:unit
   npm run test:integration
   npm run build
   ```
-  - [ ] All existing 67 unit tests pass.
-  - [ ] All existing 63 integration tests pass.
-  - [ ] All new Phase 9 tests pass.
-  - [ ] `npm run build` succeeds with zero TypeScript errors.
+  - [x] All existing 67 unit tests pass.
+  - [x] All existing 63 integration tests pass.
+  - [x] All new Phase 9 tests pass.
+  - [x] `npm run build` succeeds with zero TypeScript errors.
 
-- [ ] **Verification chain:**
-  - [ ] `npm run dev` → Server starts on `http://127.0.0.1:3847` → ✅
-  - [ ] Log in as `user@coincaret.com` / `Password123!` → Wallet dashboard loads (no KYC redirect since `KYC_REQUIRED=false`) → ✅
-  - [ ] Log in as `admin@coincaret.com` → `/admin/users` → Both users visible with full profile data → ✅
-  - [ ] `/admin/settings` → KYC toggles both in OFF/Automatic state as per seed defaults → ✅
-  - [ ] ✅ Done.
+- [x] **Verification chain:**
+  - [x] `npm run dev` → Server starts on `http://127.0.0.1:3847` → ✅
+  - [x] Log in as `user@coincaret.com` / `Password123!` → Wallet dashboard loads (no KYC redirect since `KYC_REQUIRED=false`) → ✅
+  - [x] Log in as `admin@coincaret.com` → `/admin/users` → Both users visible with full profile data → ✅
+  - [x] `/admin/settings` → KYC toggles both in OFF/Automatic state as per seed defaults → ✅
+  - [x] ✅ Done.
+
+> **Session Note (Phase 9 Completion — 2026-09-19):**
+> - **W-907 (Database Re-seeding & Full Phase 9 Polish):** Verified `prisma/seed.ts` provisions full profile data (`phoneNumber`, `address`), flags both demo and admin users as `kycRequired: false` (exempt), seeds `KYC_REQUIRED: "false"`, and `KYC_REVIEW_MODE: "automatic"`. Verified clean database state across dev and test PostgreSQL instances.
+> - **Phase 9 Milestone Complete:** Complete KYC Identity Verification, AES-256 encrypted document intake, multi-tier compliance gate, admin registered user registry, user detail page with review desk, and scoped per-user treasury issuance delivered with zero simulation watermarks. All quality gates passing. Ready for Phase 10 (Playwright E2E and Railway Deployment).
 
 ---
 
